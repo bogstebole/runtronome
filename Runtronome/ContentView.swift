@@ -59,11 +59,11 @@ struct ContentView: View {
         VStack(spacing: 6) {
             if isGarminConnected {
                 Text(trainingTitle)
-                    .font(.system(size: 16, weight: .medium, design: .monospaced))
+                    .font(.momoTrust(size: 16, weight: .medium))
                     .foregroundColor(.white)
             }
             Text(contextLine)
-                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                .font(.momoTrust(size: 11, weight: .regular))
                 .foregroundColor(Color(white: 0.5))
                 .tracking(0.5)
         }
@@ -75,14 +75,14 @@ struct ContentView: View {
         VStack(spacing: 0) {
             if isGarminConnected {
                 Text(phaseLabel)
-                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    .font(.momoTrust(size: 11, weight: .regular))
                     .foregroundColor(Color(white: 0.45))
                     .tracking(4)
                     .padding(.bottom, 6)
             }
 
             Text("\(Int(spm))")
-                .font(.system(size: 130, weight: .bold, design: .monospaced))
+                .font(.momoTrust(size: 130, weight: .bold))
                 .foregroundColor(.white)
                 .contentTransition(.numericText())
                 .animation(.snappy, value: Int(spm))
@@ -99,7 +99,7 @@ struct ContentView: View {
             .padding(.bottom, 12)
 
             Text("SPM")
-                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                .font(.momoTrust(size: 11, weight: .regular))
                 .foregroundColor(Color(white: 0.45))
                 .tracking(4)
         }
@@ -108,7 +108,7 @@ struct ContentView: View {
     private var footerView: some View {
         VStack(spacing: 16) {
             Text("\(totalSteps.formatted(.number)) TOTAL STEPS")
-                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                .font(.momoTrust(size: 11, weight: .regular))
                 .foregroundColor(Color(white: 0.45))
                 .tracking(2)
 
