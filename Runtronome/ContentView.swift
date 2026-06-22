@@ -1,5 +1,4 @@
 import SwiftUI
-import AVFoundation
 
 struct ContentView: View {
     @State private var locationService = LocationService()
@@ -176,10 +175,6 @@ struct ContentView: View {
     // MARK: Setup
 
     private func setup() {
-        // Allow metronome click through silent switch
-        try? AVAudioSession.sharedInstance().setCategory(.playback, options: .mixWithOthers)
-        try? AVAudioSession.sharedInstance().setActive(true)
-
         clockTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             currentTime = Date()
         }
