@@ -1,80 +1,98 @@
-//
-//  RuntronomeWidgetLiveActivity.swift
-//  RuntronomeWidget
-//
-//  Created by Bogdan Stefanovic on 22. 6. 2026..
-//
-
 import ActivityKit
 import WidgetKit
 import SwiftUI
 
-struct RuntronomeWidgetAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable {
-        // Dynamic stateful properties about your activity go here!
-        var emoji: String
+struct RuntronomeActivityAttributes: ActivityAttributes {
+    struct ContentState: Codable, Hashable {
+        var spm: Int
+        var alertFrequency: String
+        var phaseLabel: String
     }
 
-    // Fixed non-changing properties about your activity go here!
-    var name: String
+    let trainingTitle: String
+    let isGarminConnected: Bool
 }
 
 struct RuntronomeWidgetLiveActivity: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: RuntronomeWidgetAttributes.self) { context in
-            // Lock screen/banner UI goes here
-            VStack {
-                Text("Hello \(context.state.emoji)")
-            }
-            .activityBackgroundTint(Color.cyan)
-            .activitySystemActionForegroundColor(Color.black)
-
+        ActivityConfiguration(for: RuntronomeActivityAttributes.self) { context in
+            lockScreenView(context: context)
+                .activityBackgroundTint(Color(white: 0.1))
+                .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
-                // Expanded UI goes here.  Compose the expanded UI through
-                // various regions, like leading/trailing/center/bottom
                 DynamicIslandExpandedRegion(.leading) {
-                    Text("Leading")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(context.state.spm)")
+                            .font(.system(size: 44, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("SPM")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("Trailing")
-                }
-                DynamicIslandExpandedRegion(.bottom) {
-                    Text("Bottom \(context.state.emoji)")
-                    // more content
+                    VStack(alignment: .trailing, spacing: 4) {
+                        if context.attributes.isGarminConnected && !context.state.phaseLabel.isEmpty {
+                            Text(context.state.phaseLabel)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        Text(context.state.alertFrequency)
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .padding(.trailing, 4)
                 }
             } compactLeading: {
-                Text("L")
+                Text("\(context.state.spm)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
             } compactTrailing: {
-                Text("T \(context.state.emoji)")
+                Text(context.state.phaseLabel.isEmpty ? "SPM" : context.state.phaseLabel)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
             } minimal: {
-                Text(context.state.emoji)
+                Text("\(context.state.spm)")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
             }
-            .widgetURL(URL(string: "http://www.apple.com"))
-            .keylineTint(Color.red)
         }
     }
-}
 
-extension RuntronomeWidgetAttributes {
-    fileprivate static var preview: RuntronomeWidgetAttributes {
-        RuntronomeWidgetAttributes(name: "World")
+    private func lockScreenView(context: ActivityViewContext<RuntronomeActivityAttributes>) -> some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                if context.attributes.isGarminConnected {
+                    Text(context.attributes.trainingTitle)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                        .tracking(1)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(context.state.spm)")
+                        .font(.system(size: 52, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    Text("SPM")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.45))
+                }
+                Text(context.state.alertFrequency)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.45))
+                    .tracking(1)
+            }
+            Spacer()
+            if context.attributes.isGarminConnected && !context.state.phaseLabel.isEmpty {
+                Text(context.state.phaseLabel)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.85))
+                    .tracking(2)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
     }
-}
-
-extension RuntronomeWidgetAttributes.ContentState {
-    fileprivate static var smiley: RuntronomeWidgetAttributes.ContentState {
-        RuntronomeWidgetAttributes.ContentState(emoji: "😀")
-     }
-     
-     fileprivate static var starEyes: RuntronomeWidgetAttributes.ContentState {
-         RuntronomeWidgetAttributes.ContentState(emoji: "🤩")
-     }
-}
-
-#Preview("Notification", as: .content, using: RuntronomeWidgetAttributes.preview) {
-   RuntronomeWidgetLiveActivity()
-} contentStates: {
-    RuntronomeWidgetAttributes.ContentState.smiley
-    RuntronomeWidgetAttributes.ContentState.starEyes
 }

@@ -5,5 +5,6 @@ import SwiftUI
 struct RuntronomeWidgetBundle: WidgetBundle {
     var body: some Widget {
         RuntronomeWidget()
+        RuntronomeWidgetLiveActivity()
     }
 }

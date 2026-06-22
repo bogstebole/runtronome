@@ -1,4 +1,5 @@
 import SwiftUI
+import ActivityKit
 
 struct ContentView: View {
     @State private var locationService = LocationService()
@@ -23,6 +24,7 @@ struct ContentView: View {
     @FocusState private var spmFieldFocused: Bool
 
     private static let sound = MetronomeSound()
+    @State private var liveActivity: Activity<RuntronomeActivityAttributes>?
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
@@ -61,9 +63,9 @@ struct ContentView: View {
         .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: hapticTrigger)
         .onAppear { setup() }
         .onDisappear { teardown() }
-        .onChange(of: spm) { _, _ in syncWidget() }
-        .onChange(of: alertFrequency) { _, _ in syncWidget() }
-        .onChange(of: phaseLabel) { _, _ in syncWidget() }
+        .onChange(of: spm) { _, _ in syncWidget(); if isPlaying { updateLiveActivity() } }
+        .onChange(of: alertFrequency) { _, _ in syncWidget(); if isPlaying { updateLiveActivity() } }
+        .onChange(of: phaseLabel) { _, _ in syncWidget(); if isPlaying { updateLiveActivity() } }
         .onChange(of: isGarminConnected) { _, _ in syncWidget() }
     }
 
@@ -211,11 +213,13 @@ struct ContentView: View {
         metronomeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             tick()
         }
+        startLiveActivity()
     }
 
     private func stopMetronome() {
         metronomeTimer?.invalidate()
         metronomeTimer = nil
+        endLiveActivity()
     }
 
     private func restartMetronome() {
@@ -230,6 +234,42 @@ struct ContentView: View {
         }
         isEditingSPM = false
         spmFieldFocused = false
+    }
+
+    // MARK: Live Activity
+
+    private func startLiveActivity() {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let attributes = RuntronomeActivityAttributes(
+            trainingTitle: trainingTitle,
+            isGarminConnected: isGarminConnected
+        )
+        let state = RuntronomeActivityAttributes.ContentState(
+            spm: Int(spm),
+            alertFrequency: alertFrequency.rawValue,
+            phaseLabel: phaseLabel
+        )
+        liveActivity = try? Activity.request(
+            attributes: attributes,
+            content: .init(state: state, staleDate: nil)
+        )
+    }
+
+    private func updateLiveActivity() {
+        guard let activity = liveActivity else { return }
+        let state = RuntronomeActivityAttributes.ContentState(
+            spm: Int(spm),
+            alertFrequency: alertFrequency.rawValue,
+            phaseLabel: phaseLabel
+        )
+        Task { await activity.update(.init(state: state, staleDate: nil)) }
+    }
+
+    private func endLiveActivity() {
+        Task {
+            await liveActivity?.end(nil, dismissalPolicy: .immediate)
+            liveActivity = nil
+        }
     }
 
     private func tick() {
