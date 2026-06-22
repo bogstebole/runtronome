@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var currentTime = Date()
     @State private var clockTimer: Timer?
     @State private var hapticTrigger = 0
+    @State private var isSliderActive = false
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
@@ -42,8 +43,14 @@ struct ContentView: View {
 
             VStack(spacing: 0) {
                 headerView
+                    .scaleEffect(isSliderActive ? 0.85 : 1.0)
+                    .opacity(isSliderActive ? 0.5 : 1.0)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSliderActive)
                 Spacer()
                 centralView
+                    .scaleEffect(isSliderActive ? 0.85 : 1.0)
+                    .opacity(isSliderActive ? 0.5 : 1.0)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSliderActive)
                 Spacer()
                 footerView
             }
@@ -111,19 +118,26 @@ struct ContentView: View {
                 .font(.momoTrust(size: 11, weight: .regular))
                 .foregroundColor(Color(white: 0.45))
                 .tracking(2)
+                .scaleEffect(isSliderActive ? 0.85 : 1.0)
+                .opacity(isSliderActive ? 0.5 : 1.0)
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSliderActive)
 
-            HStack(spacing: 16) {
+            HStack(spacing: 0) {
                 Button(action: togglePlayback) {
                     RuntronomeButton(style: .circular(systemImage: isPlaying ? "pause.fill" : "play.fill"))
                 }
                 .buttonStyle(.plain)
+                .frame(width: isSliderActive ? 0 : 52, height: 52)
+                .clipped()
+                .padding(.trailing, isSliderActive ? 0 : 16)
 
-                SPMSlider(value: $spm, range: 0...300)
+                SPMSlider(value: $spm, range: 0...300, isActive: $isSliderActive)
                     .onChange(of: spm) { _, _ in
                         if isPlaying { restartMetronome() }
                     }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, isSliderActive ? 40 : 20)
+            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isSliderActive)
         }
         .padding(.bottom, 48)
     }

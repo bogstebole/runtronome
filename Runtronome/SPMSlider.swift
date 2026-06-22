@@ -3,6 +3,7 @@ import SwiftUI
 struct SPMSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
+    @Binding var isActive: Bool
 
     private let tickCount = 10
 
@@ -13,16 +14,12 @@ struct SPMSlider: View {
             let fillW = w * max(progress, 0)
 
             ZStack(alignment: .leading) {
-                // Background — #FFFFFF30
                 Color.white.opacity(0.188)
 
-                // Value fill — #FFFFFFB3, clipped by outer clipShape
                 Color.white.opacity(0.702)
                     .frame(width: max(fillW, 0))
                     .frame(maxHeight: .infinity)
 
-                // Fixed tick marks — space-between, paddingInline 16pt
-                // Color #767676 + hard-light blend mode
                 HStack {
                     ForEach(0..<tickCount, id: \.self) { i in
                         Rectangle()
@@ -42,14 +39,33 @@ struct SPMSlider: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in
+                        if !isActive {
+                            // Animate only the activation — not the fill/tick updates
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.65)) {
+                                isActive = true
+                            }
+                        }
                         let pct = min(max(Double(drag.location.x / w), 0), 1)
-                        let newValue = (range.lowerBound + pct * (range.upperBound - range.lowerBound)).rounded()
-                        value = newValue
+                        value = (range.lowerBound + pct * (range.upperBound - range.lowerBound)).rounded()
+                    }
+                    .onEnded { _ in
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.65)) {
+                            isActive = false
+                        }
                     }
             )
         }
         .frame(height: 56)
-        // Fires on every 1-SPM step — ratchet/gear feel
+        .scaleEffect(isActive ? 1.15 : 1.0)
+        .shadow(
+            color: .black.opacity(isActive ? 0.5 : 0),
+            radius: isActive ? 20 : 0,
+            x: 0,
+            y: isActive ? 8 : 0
+        )
+        .zIndex(isActive ? 1 : 0)
+        .sensoryFeedback(.impact(weight: .heavy, intensity: 1.0), trigger: isActive) { _, new in new }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: isActive) { _, new in !new }
         .sensoryFeedback(.selection, trigger: value)
     }
 }
