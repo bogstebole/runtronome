@@ -1,5 +1,4 @@
 import SwiftUI
-import AudioToolbox
 import AVFoundation
 
 struct ContentView: View {
@@ -20,6 +19,11 @@ struct ContentView: View {
     @State private var clockTimer: Timer?
     @State private var hapticTrigger = 0
     @State private var isSliderActive = false
+    @State private var isEditingSPM = false
+    @State private var spmInputText = ""
+    @FocusState private var spmFieldFocused: Bool
+
+    private static let sound = MetronomeSound()
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
@@ -88,12 +92,39 @@ struct ContentView: View {
                     .padding(.bottom, 6)
             }
 
-            Text("\(Int(spm))")
-                .font(.momoTrust(size: 130, weight: .bold))
-                .foregroundColor(.white)
-                .contentTransition(.numericText())
-                .animation(.snappy, value: Int(spm))
-                .padding(.bottom, 20)
+            Group {
+                if isEditingSPM {
+                    TextField("", text: $spmInputText)
+                        .font(.momoTrust(size: 130, weight: .bold))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .keyboardType(.numberPad)
+                        .focused($spmFieldFocused)
+                        .toolbar {
+                            ToolbarItemGroup(placement: .keyboard) {
+                                Spacer()
+                                Button("Done") { commitSPMEdit() }
+                                    .font(.momoTrust(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                } else {
+                    Text("\(Int(spm))")
+                        .font(.momoTrust(size: 130, weight: .bold))
+                        .foregroundColor(.white)
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: Int(spm))
+                        .onTapGesture {
+                            spmInputText = "\(Int(spm))"
+                            isEditingSPM = true
+                            spmFieldFocused = true
+                        }
+                }
+            }
+            .padding(.bottom, 20)
+            .onChange(of: spmFieldFocused) { _, focused in
+                if !focused { commitSPMEdit() }
+            }
 
             Menu {
                 ForEach(AlertFrequency.allCases) { freq in
@@ -185,11 +216,20 @@ struct ContentView: View {
         startMetronome()
     }
 
+    private func commitSPMEdit() {
+        if let parsed = Double(spmInputText) {
+            spm = min(max(parsed.rounded(), 0), 300)
+            if isPlaying { restartMetronome() }
+        }
+        isEditingSPM = false
+        spmFieldFocused = false
+    }
+
     private func tick() {
         totalSteps += 1
         stepCount += 1
         if stepCount % alertFrequency.stepInterval == 0 {
-            AudioServicesPlaySystemSound(1057)
+            ContentView.sound.play()
             hapticTrigger += 1
         }
     }
