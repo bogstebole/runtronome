@@ -191,7 +191,7 @@ struct ContentView: View {
             if storedSPM != Int(spm) && !isEditingSPM {
                 spm = Double(storedSPM)
                 if isPlaying { restartMetronome() }
-                updateLiveActivity()
+                updateLiveActivity(spmOverride: storedSPM)
             }
         }
     }
@@ -266,10 +266,10 @@ struct ContentView: View {
         )
     }
 
-    private func updateLiveActivity() {
+    private func updateLiveActivity(spmOverride: Int? = nil) {
         guard let activity = liveActivity else { return }
         let state = RuntronomeActivityAttributes.ContentState(
-            spm: Int(spm),
+            spm: spmOverride ?? Int(spm),
             alertFrequency: alertFrequency.rawValue,
             phaseLabel: phaseLabel
         )
