@@ -12,6 +12,10 @@ enum SharedStore {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
+    static func readSPM() -> Int {
+        defaults.integer(forKey: "spm").nonZero ?? 175
+    }
+
     static func read() -> (spm: Int, alertFrequency: String, phaseLabel: String, isGarminConnected: Bool) {
         (
             spm: defaults.integer(forKey: "spm").nonZero ?? 175,

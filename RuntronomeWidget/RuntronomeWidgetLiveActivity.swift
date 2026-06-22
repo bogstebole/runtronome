@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import WidgetKit
 import SwiftUI
 
@@ -42,6 +43,24 @@ struct RuntronomeWidgetLiveActivity: Widget {
                         Text(context.state.alertFrequency)
                             .font(.system(size: 11))
                             .foregroundColor(.white.opacity(0.5))
+                        HStack(spacing: 8) {
+                            Button(intent: DecreaseSPMIntent()) {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color.white.opacity(0.15), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            Button(intent: IncreaseSPMIntent()) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color.white.opacity(0.15), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .padding(.trailing, 4)
                 }
@@ -85,11 +104,23 @@ struct RuntronomeWidgetLiveActivity: Widget {
                     .tracking(1)
             }
             Spacer()
-            if context.attributes.isGarminConnected && !context.state.phaseLabel.isEmpty {
-                Text(context.state.phaseLabel)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.85))
-                    .tracking(2)
+            VStack(spacing: 10) {
+                Button(intent: IncreaseSPMIntent()) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color.white.opacity(0.15), in: Circle())
+                }
+                .buttonStyle(.plain)
+                Button(intent: DecreaseSPMIntent()) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color.white.opacity(0.15), in: Circle())
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 20)

@@ -182,6 +182,11 @@ struct ContentView: View {
         syncWidget()
         clockTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             currentTime = Date()
+            let storedSPM = SharedStore.readSPM()
+            if storedSPM != Int(spm) && !isEditingSPM {
+                spm = Double(storedSPM)
+                if isPlaying { restartMetronome() }
+            }
         }
     }
 
