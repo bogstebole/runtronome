@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E84184D12FE9D036003C48DD /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E84184D02FE9D036003C48DD /* WidgetKit.framework */; };
+		E84184D32FE9D036003C48DD /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E84184D22FE9D036003C48DD /* SwiftUI.framework */; };
+		E84184E22FE9D037003C48DD /* RuntronomeWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E84184CE2FE9D036003C48DD /* RuntronomeWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		E84184982FE7499C003C48DD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,13 +27,48 @@
 			remoteGlobalIDString = E84184892FE74998003C48DD;
 			remoteInfo = Runtronome;
 		};
+		E84184E02FE9D037003C48DD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E84184822FE74998003C48DD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E84184CD2FE9D036003C48DD;
+			remoteInfo = RuntronomeWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E84184E72FE9D037003C48DD /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				E84184E22FE9D037003C48DD /* RuntronomeWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		E841848A2FE74998003C48DD /* Runtronome.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runtronome.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E84184972FE7499C003C48DD /* RuntronomeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RuntronomeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E84184A12FE7499C003C48DD /* RuntronomeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RuntronomeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E84184CE2FE9D036003C48DD /* RuntronomeWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RuntronomeWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E84184D02FE9D036003C48DD /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		E84184D22FE9D036003C48DD /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		E84184E92FE9D0C6003C48DD /* RuntronomeWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RuntronomeWidgetExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E84184E32FE9D037003C48DD /* Exceptions for "RuntronomeWidget" folder in "RuntronomeWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E84184CD2FE9D036003C48DD /* RuntronomeWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E841848C2FE74998003C48DD /* Runtronome */ = {
@@ -43,6 +84,14 @@
 		E84184A42FE7499C003C48DD /* RuntronomeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = RuntronomeUITests;
+			sourceTree = "<group>";
+		};
+		E84184D42FE9D036003C48DD /* RuntronomeWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E84184E32FE9D037003C48DD /* Exceptions for "RuntronomeWidget" folder in "RuntronomeWidgetExtension" target */,
+			);
+			path = RuntronomeWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,15 +118,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E84184CB2FE9D036003C48DD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E84184D32FE9D036003C48DD /* SwiftUI.framework in Frameworks */,
+				E84184D12FE9D036003C48DD /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		E84184812FE74998003C48DD = {
 			isa = PBXGroup;
 			children = (
+				E84184E92FE9D0C6003C48DD /* RuntronomeWidgetExtension.entitlements */,
 				E841848C2FE74998003C48DD /* Runtronome */,
 				E841849A2FE7499C003C48DD /* RuntronomeTests */,
 				E84184A42FE7499C003C48DD /* RuntronomeUITests */,
+				E84184D42FE9D036003C48DD /* RuntronomeWidget */,
+				E84184CF2FE9D036003C48DD /* Frameworks */,
 				E841848B2FE74998003C48DD /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,8 +149,18 @@
 				E841848A2FE74998003C48DD /* Runtronome.app */,
 				E84184972FE7499C003C48DD /* RuntronomeTests.xctest */,
 				E84184A12FE7499C003C48DD /* RuntronomeUITests.xctest */,
+				E84184CE2FE9D036003C48DD /* RuntronomeWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		E84184CF2FE9D036003C48DD /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E84184D02FE9D036003C48DD /* WidgetKit.framework */,
+				E84184D22FE9D036003C48DD /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -102,10 +173,12 @@
 				E84184862FE74998003C48DD /* Sources */,
 				E84184872FE74998003C48DD /* Frameworks */,
 				E84184882FE74998003C48DD /* Resources */,
+				E84184E72FE9D037003C48DD /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				E84184E12FE9D037003C48DD /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				E841848C2FE74998003C48DD /* Runtronome */,
@@ -163,6 +236,28 @@
 			productReference = E84184A12FE7499C003C48DD /* RuntronomeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		E84184CD2FE9D036003C48DD /* RuntronomeWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E84184E42FE9D037003C48DD /* Build configuration list for PBXNativeTarget "RuntronomeWidgetExtension" */;
+			buildPhases = (
+				E84184CA2FE9D036003C48DD /* Sources */,
+				E84184CB2FE9D036003C48DD /* Frameworks */,
+				E84184CC2FE9D036003C48DD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E84184D42FE9D036003C48DD /* RuntronomeWidget */,
+			);
+			name = RuntronomeWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = RuntronomeWidgetExtension;
+			productReference = E84184CE2FE9D036003C48DD /* RuntronomeWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -184,6 +279,9 @@
 						CreatedOnToolsVersion = 26.5;
 						TestTargetID = E84184892FE74998003C48DD;
 					};
+					E84184CD2FE9D036003C48DD = {
+						CreatedOnToolsVersion = 26.5;
+					};
 				};
 			};
 			buildConfigurationList = E84184852FE74998003C48DD /* Build configuration list for PBXProject "Runtronome" */;
@@ -203,6 +301,7 @@
 				E84184892FE74998003C48DD /* Runtronome */,
 				E84184962FE7499C003C48DD /* RuntronomeTests */,
 				E84184A02FE7499C003C48DD /* RuntronomeUITests */,
+				E84184CD2FE9D036003C48DD /* RuntronomeWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +322,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		E841849F2FE7499C003C48DD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E84184CC2FE9D036003C48DD /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -253,6 +359,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E84184CA2FE9D036003C48DD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +378,11 @@
 			isa = PBXTargetDependency;
 			target = E84184892FE74998003C48DD /* Runtronome */;
 			targetProxy = E84184A22FE7499C003C48DD /* PBXContainerItemProxy */;
+		};
+		E84184E12FE9D037003C48DD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E84184CD2FE9D036003C48DD /* RuntronomeWidgetExtension */;
+			targetProxy = E84184E02FE9D037003C48DD /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -395,6 +513,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Runtronome/Runtronome.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = QLXB6T6X9W;
@@ -428,6 +547,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Runtronome/Runtronome.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = QLXB6T6X9W;
@@ -540,6 +660,68 @@
 			};
 			name = Release;
 		};
+		E84184E52FE9D037003C48DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = RuntronomeWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QLXB6T6X9W;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RuntronomeWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RuntronomeWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = test.Runtronome.RuntronomeWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E84184E62FE9D037003C48DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = RuntronomeWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QLXB6T6X9W;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RuntronomeWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RuntronomeWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = test.Runtronome.RuntronomeWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -575,6 +757,15 @@
 			buildConfigurations = (
 				E84184B22FE7499C003C48DD /* Debug */,
 				E84184B32FE7499C003C48DD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E84184E42FE9D037003C48DD /* Build configuration list for PBXNativeTarget "RuntronomeWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E84184E52FE9D037003C48DD /* Debug */,
+				E84184E62FE9D037003C48DD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

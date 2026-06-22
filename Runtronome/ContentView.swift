@@ -61,6 +61,10 @@ struct ContentView: View {
         .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: hapticTrigger)
         .onAppear { setup() }
         .onDisappear { teardown() }
+        .onChange(of: spm) { _, _ in syncWidget() }
+        .onChange(of: alertFrequency) { _, _ in syncWidget() }
+        .onChange(of: phaseLabel) { _, _ in syncWidget() }
+        .onChange(of: isGarminConnected) { _, _ in syncWidget() }
     }
 
     // MARK: Subviews
@@ -111,8 +115,6 @@ struct ContentView: View {
                     Text("\(Int(spm))")
                         .font(.momoTrust(size: 130, weight: .bold))
                         .foregroundColor(.white)
-                        .contentTransition(.numericText())
-                        .animation(.snappy, value: Int(spm))
                         .onTapGesture {
                             spmInputText = "\(Int(spm))"
                             isEditingSPM = true
@@ -175,9 +177,19 @@ struct ContentView: View {
     // MARK: Setup
 
     private func setup() {
+        syncWidget()
         clockTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             currentTime = Date()
         }
+    }
+
+    private func syncWidget() {
+        SharedStore.sync(
+            spm: Int(spm),
+            alertFrequency: alertFrequency.rawValue,
+            phaseLabel: phaseLabel,
+            isGarminConnected: isGarminConnected
+        )
     }
 
     private func teardown() {
