@@ -180,12 +180,18 @@ struct ContentView: View {
 
     private func setup() {
         syncWidget()
-        clockTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            currentTime = Date()
+        clockTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
+            // Update clock display once per second
+            let now = Date()
+            if Int(now.timeIntervalSince1970) != Int(currentTime.timeIntervalSince1970) {
+                currentTime = now
+            }
+            // Sync SPM changed externally (Live Activity buttons)
             let storedSPM = SharedStore.readSPM()
             if storedSPM != Int(spm) && !isEditingSPM {
                 spm = Double(storedSPM)
                 if isPlaying { restartMetronome() }
+                updateLiveActivity()
             }
         }
     }

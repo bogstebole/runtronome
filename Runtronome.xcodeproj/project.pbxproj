@@ -68,11 +68,21 @@
 			);
 			target = E84184CD2FE9D036003C48DD /* RuntronomeWidgetExtension */;
 		};
+		E84184F62FE9D7F4003C48DD /* Exceptions for "Runtronome" folder in "Runtronome" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E84184892FE74998003C48DD /* Runtronome */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E841848C2FE74998003C48DD /* Runtronome */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E84184F62FE9D7F4003C48DD /* Exceptions for "Runtronome" folder in "Runtronome" target */,
+			);
 			path = Runtronome;
 			sourceTree = "<group>";
 		};
@@ -519,6 +529,7 @@
 				DEVELOPMENT_TEAM = QLXB6T6X9W;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Runtronome/Info.plist;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runtronome uses your location to show your city and weather.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -554,6 +565,7 @@
 				DEVELOPMENT_TEAM = QLXB6T6X9W;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Runtronome/Info.plist;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runtronome uses your location to show your city and weather.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
