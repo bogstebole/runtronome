@@ -75,6 +75,13 @@
 			);
 			target = E84184892FE74998003C48DD /* Runtronome */;
 		};
+		E8AA00012FE9D7F4003C48DD /* Exceptions for "RuntronomeWidget" folder in "Runtronome" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				RuntronomeActivityIntents.swift,
+			);
+			target = E84184892FE74998003C48DD /* Runtronome */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -100,6 +107,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				E84184E32FE9D037003C48DD /* Exceptions for "RuntronomeWidget" folder in "RuntronomeWidgetExtension" target */,
+				E8AA00012FE9D7F4003C48DD /* Exceptions for "RuntronomeWidget" folder in "Runtronome" target */,
 			);
 			path = RuntronomeWidget;
 			sourceTree = "<group>";
