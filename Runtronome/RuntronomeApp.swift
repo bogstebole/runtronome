@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct RuntronomeApp: App {
     init() {
-        MomoTrustFont.register()
+        AppFonts.register()
     }
 
     var body: some Scene {

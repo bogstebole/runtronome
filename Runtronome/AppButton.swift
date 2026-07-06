@@ -21,7 +21,7 @@ struct AppButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let pressed = configuration.isPressed
         return configuration.label
-            .font(.momoTrust(size: size == .large ? 14 : 12, weight: .bold))
+            .font(.appSans(size: size == .large ? 14 : 12, weight: .bold))
             .tracking(1.5)
             .foregroundColor(labelColor)
             .padding(.horizontal, size == .large ? 24 : 16)

@@ -79,7 +79,7 @@ struct PlansFlowView: View {
                                     withAnimation(.snappy) { plans = PlanStore.delete(plan.id) }
                                 } label: {
                                     Text("DELETE")
-                                        .font(.momoTrust(size: 12, weight: .bold))
+                                        .font(.appSans(size: 12, weight: .bold))
                                         .tracking(1.5)
                                 }
                             }
@@ -159,7 +159,7 @@ struct PlansFlowView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(plan.title.uppercased())
-                        .font(.momoTrust(size: 14, weight: .medium))
+                        .font(.appSans(size: 14, weight: .medium))
                         .tracking(1.0)
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
@@ -235,11 +235,11 @@ struct PlansFlowView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Text("NO PLANS YET")
-                .font(.momoTrust(size: 14, weight: .medium))
+                .font(.appSans(size: 14, weight: .medium))
                 .tracking(1.2)
                 .foregroundColor(Theme.textPrimary)
             Text("Build a workout once and it stays here —\nload, edit or duplicate it before every run.")
-                .font(.momoTrust(size: 12, weight: .regular))
+                .font(.appSans(size: 12, weight: .regular))
                 .foregroundColor(Theme.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)

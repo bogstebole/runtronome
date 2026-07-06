@@ -50,7 +50,7 @@ struct NumberField<Field: Hashable>: View {
 
             if let caption {
                 Text(caption)
-                    .font(.momoTrust(size: 8, weight: .regular))
+                    .font(.appSans(size: 8, weight: .regular))
                     .tracking(1.2)
                     .foregroundColor(Theme.textTertiary)
                     .padding(.top, 3)

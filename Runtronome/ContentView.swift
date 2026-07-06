@@ -161,7 +161,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(phase.title.isEmpty ? "PHASE" : phase.title.uppercased())
-                        .font(.momoTrust(size: 14, weight: .medium))
+                        .font(.appSans(size: 14, weight: .medium))
                         .tracking(1.2)
                         .foregroundColor(Theme.textPrimary)
                     Spacer()
@@ -170,7 +170,7 @@ struct ContentView: View {
 
                 if let next = nextPhase {
                     Text("NEXT – \(nextSummary(next))")
-                        .font(.momoTrust(size: 12, weight: .regular))
+                        .font(.appSans(size: 12, weight: .regular))
                         .tracking(1.2)
                         .foregroundColor(Theme.textSecondary)
                 }
@@ -192,13 +192,13 @@ struct ContentView: View {
         switch phase.goal {
         case .time:
             Text(isIdle ? phase.goal.display.uppercased() : countdownString)
-                .font(.momoTrust(size: 15, weight: .semibold))
+                .font(.appSans(size: 15, weight: .semibold))
                 .foregroundColor(Theme.textPrimary)
                 .monospacedDigit()
                 .contentTransition(.numericText())
         case .distance(let meters):
             Text("\(meters) M")
-                .font(.momoTrust(size: 15, weight: .semibold))
+                .font(.appSans(size: 15, weight: .semibold))
                 .foregroundColor(Theme.textPrimary)
         case .pause:
             EmptyView()
@@ -393,7 +393,7 @@ struct ContentView: View {
                             ToolbarItemGroup(placement: .keyboard) {
                                 Spacer()
                                 Button("Done") { commitSPMEdit() }
-                                    .font(.momoTrust(size: 16, weight: .medium))
+                                    .font(.appSans(size: 16, weight: .medium))
                                     .foregroundColor(.white)
                             }
                         }
@@ -538,7 +538,7 @@ struct ContentView: View {
     private func freqOption(_ freq: AlertFrequency, isSelected: Bool) -> some View {
         Button { selectFrequency(freq) } label: {
             Text(freq.displayLabel)
-                .font(.momoTrust(size: 12, weight: .bold))
+                .font(.appSans(size: 12, weight: .bold))
                 .tracking(1.5)
                 .foregroundColor(isSelected ? Theme.ctaLabel : .white)
                 .padding(.horizontal, 16)

@@ -83,7 +83,7 @@ struct ManualPlanBuilderView: View {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button("Done") { focused = nil }
-                    .font(.momoTrust(size: 16, weight: .medium))
+                    .font(.appSans(size: 16, weight: .medium))
                     .foregroundColor(.white)
             }
         }
@@ -119,10 +119,10 @@ struct ManualPlanBuilderView: View {
     private var planNameCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("PLAN NAME")
-                .font(.momoTrust(size: 10, weight: .regular))
+                .font(.appSans(size: 10, weight: .regular))
                 .foregroundColor(Theme.textTertiary)
             TextField("", text: $title, prompt: Text("Name your plan"))
-                .font(.momoTrust(size: 22, weight: .semibold))
+                .font(.appSans(size: 22, weight: .semibold))
                 .foregroundColor(Theme.textPrimary)
                 .tint(Theme.textPrimary)
                 .focused($focused, equals: .planTitle)
@@ -182,14 +182,14 @@ struct ManualPlanBuilderView: View {
                 .frame(width: 22)
 
             TextField("", text: title, prompt: Text(placeholder))
-                .font(.momoTrust(size: 16, weight: .semibold))
+                .font(.appSans(size: 16, weight: .semibold))
                 .foregroundColor(Theme.textPrimary)
                 .tint(Theme.textPrimary)
                 .focused($focused, equals: .elementTitle(id))
 
             if let badge {
                 Text(badge)
-                    .font(.momoTrust(size: 9, weight: .bold))
+                    .font(.appSans(size: 9, weight: .bold))
                     .tracking(1.2)
                     .foregroundColor(Theme.textTertiary)
                     .padding(.horizontal, 7)
@@ -211,7 +211,7 @@ struct ManualPlanBuilderView: View {
     private func stepSection<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(label)
-                .font(.momoTrust(size: 11, weight: .semibold))
+                .font(.appSans(size: 11, weight: .semibold))
                 .foregroundColor(Theme.textPrimary)
             content()
         }
@@ -220,7 +220,7 @@ struct ManualPlanBuilderView: View {
     private func roundsRow(_ rounds: Binding<Int>) -> some View {
         HStack(spacing: 12) {
             Text("ROUNDS")
-                .font(.momoTrust(size: 10, weight: .semibold))
+                .font(.appSans(size: 10, weight: .semibold))
                 .tracking(1.2)
                 .foregroundColor(Theme.textTertiary)
                 .frame(width: 84, alignment: .leading)
@@ -269,7 +269,7 @@ struct ManualPlanBuilderView: View {
         Button(action: action) {
             HStack(spacing: 7) {
                 Image(systemName: icon).font(.system(size: 13, weight: .semibold))
-                Text(label).font(.momoTrust(size: 12, weight: .bold)).tracking(1.2)
+                Text(label).font(.appSans(size: 12, weight: .bold)).tracking(1.2)
             }
             .foregroundColor(Theme.textSecondary)
             .frame(maxWidth: .infinity)
@@ -372,7 +372,7 @@ private struct StepEditor: View {
             if isPause {
                 Hairline()
                 Text("Pauses until you tap to continue.")
-                    .font(.momoTrust(size: 12, weight: .regular))
+                    .font(.appSans(size: 12, weight: .regular))
                     .foregroundColor(Theme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 12)
@@ -404,7 +404,7 @@ private struct StepEditor: View {
     private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(spacing: 12) {
             Text(label)
-                .font(.momoTrust(size: 10, weight: .semibold))
+                .font(.appSans(size: 10, weight: .semibold))
                 .tracking(1.2)
                 .foregroundColor(Theme.textTertiary)
                 .frame(width: 84, alignment: .leading)
@@ -417,14 +417,14 @@ private struct StepEditor: View {
     private var noteRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text("NOTE")
-                .font(.momoTrust(size: 10, weight: .semibold))
+                .font(.appSans(size: 10, weight: .semibold))
                 .tracking(1.2)
                 .foregroundColor(Theme.textTertiary)
                 .frame(width: 84, alignment: .leading)
             TextField("", text: noteText,
                       prompt: Text("Add a description").foregroundStyle(Theme.textTertiary),
                       axis: .vertical)
-                .font(.momoTrust(size: 13, weight: .regular))
+                .font(.appSans(size: 13, weight: .regular))
                 .foregroundColor(Theme.textSecondary)
                 .tint(Theme.textPrimary)
                 .lineLimit(1...3)
@@ -450,7 +450,7 @@ private struct StepEditor: View {
     private func chip(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.momoTrust(size: 11, weight: .bold))
+                .font(.appSans(size: 11, weight: .bold))
                 .tracking(1.0)
                 .foregroundColor(active ? Theme.ctaLabel : Theme.textSecondary)
                 .padding(.horizontal, 10)
@@ -489,7 +489,7 @@ private struct StepEditor: View {
                 focused: $focused, field: .distance(phase.id)
             )
             Text("M")
-                .font(.momoTrust(size: 11, weight: .regular))
+                .font(.appSans(size: 11, weight: .regular))
                 .tracking(1.2)
                 .foregroundColor(Theme.textTertiary)
         }

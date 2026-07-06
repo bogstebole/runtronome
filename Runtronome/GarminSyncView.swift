@@ -69,7 +69,7 @@ struct GarminSyncView: View {
                         Image(systemName: "arrow.left")
                             .font(.system(size: 11, weight: .bold))
                         Text("PLANS")
-                            .font(.momoTrust(size: 11, weight: .bold))
+                            .font(.appSans(size: 11, weight: .bold))
                             .tracking(1.5)
                     }
                     .foregroundColor(Theme.textSecondary)
@@ -137,7 +137,7 @@ struct GarminSyncView: View {
                     .textContentType(.username)
                 secureField("PASSWORD", text: $password, focus: .password)
                 Text("Your credentials go only to Garmin — the app keeps just the sign-in token, stored in the Keychain.")
-                    .font(.momoTrust(size: 12, weight: .regular))
+                    .font(.appSans(size: 12, weight: .regular))
                     .foregroundColor(Theme.textTertiary)
                     .lineSpacing(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -148,7 +148,7 @@ struct GarminSyncView: View {
                 field("MFA CODE", text: $mfaCode, focus: .mfa)
                     .keyboardType(.numberPad)
                 Text("Garmin sent a verification code to your email or authenticator app.")
-                    .font(.momoTrust(size: 12, weight: .regular))
+                    .font(.appSans(size: 12, weight: .regular))
                     .foregroundColor(Theme.textTertiary)
                     .lineSpacing(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -168,11 +168,11 @@ struct GarminSyncView: View {
         case .failed(let message):
             VStack(spacing: 14) {
                 Text("COULDN'T SYNC")
-                    .font(.momoTrust(size: 14, weight: .medium))
+                    .font(.appSans(size: 14, weight: .medium))
                     .tracking(1.2)
                     .foregroundColor(Theme.textPrimary)
                 Text(message)
-                    .font(.momoTrust(size: 13, weight: .regular))
+                    .font(.appSans(size: 13, weight: .regular))
                     .foregroundColor(Theme.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
@@ -208,7 +208,7 @@ struct GarminSyncView: View {
         VStack(alignment: .leading, spacing: 8) {
             MetaLabel(text: label, color: Theme.textTertiary)
             input()
-                .font(.momoTrust(size: 17, weight: .medium))
+                .font(.appSans(size: 17, weight: .medium))
                 .foregroundColor(Theme.textPrimary)
                 .tint(Theme.textPrimary)
                 .frame(height: 28)
@@ -264,11 +264,11 @@ struct GarminSyncView: View {
             if workouts.isEmpty {
                 VStack(spacing: 10) {
                     Text("NOTHING SCHEDULED")
-                        .font(.momoTrust(size: 14, weight: .medium))
+                        .font(.appSans(size: 14, weight: .medium))
                         .tracking(1.2)
                         .foregroundColor(Theme.textPrimary)
                     Text("No planned workouts on your Garmin calendar in the coming weeks.")
-                        .font(.momoTrust(size: 12, weight: .regular))
+                        .font(.appSans(size: 12, weight: .regular))
                         .foregroundColor(Theme.textSecondary)
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
@@ -291,13 +291,13 @@ struct GarminSyncView: View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
                 Text(Self.rowDateFormatter.string(from: workout.date).uppercased())
-                    .font(.momoTrust(size: 11, weight: .bold))
+                    .font(.appSans(size: 11, weight: .bold))
                     .tracking(1.0)
                     .foregroundColor(isToday(workout.date) ? Theme.textPrimary : Theme.textTertiary)
                     .frame(width: 92, alignment: .leading)
 
                 Text(workout.title)
-                    .font(.momoTrust(size: 15, weight: .medium))
+                    .font(.appSans(size: 15, weight: .medium))
                     .foregroundColor(isNew ? Theme.textPrimary : Theme.textTertiary)
                     .lineLimit(1)
 
@@ -315,7 +315,7 @@ struct GarminSyncView: View {
     /// Small caps chip: filled white for NEW, hairline-outlined for SYNCED.
     private func statusBadge(_ text: String, filled: Bool) -> some View {
         Text(text)
-            .font(.momoTrust(size: 9, weight: .bold))
+            .font(.appSans(size: 9, weight: .bold))
             .tracking(1.2)
             .foregroundColor(filled ? Theme.ctaLabel : Theme.textTertiary)
             .padding(.horizontal, 8)

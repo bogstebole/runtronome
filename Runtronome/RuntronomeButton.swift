@@ -22,7 +22,7 @@ struct RuntronomeButton: View {
             }
         case .pill(let text):
             Text(text)
-                .font(.momoTrust(size: 12, weight: .bold))
+                .font(.appSans(size: 12, weight: .bold))
                 .tracking(1.5)
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
