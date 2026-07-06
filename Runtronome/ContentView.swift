@@ -319,10 +319,10 @@ struct ContentView: View {
                 let sign: CGFloat = raw < 0 ? -1 : 1
 
                 // Keyframes from the original poster rail:
-                // hero 140pt/100% → ±1 58pt/38% → ±2 40pt/28% → gone.
+                // hero 140pt/100% → ±1 66pt/38% → ±2 40pt/28% → gone.
                 let scale = dist <= rowHeight
-                    ? 1 - (dist / rowHeight) * (1 - 0.414)
-                    : max(0.286, 0.414 - ((dist - rowHeight) / rowHeight) * (0.414 - 0.286))
+                    ? 1 - (dist / rowHeight) * (1 - 0.471)
+                    : max(0.286, 0.471 - ((dist - rowHeight) / rowHeight) * (0.471 - 0.286))
                 let opacity = dist <= rowHeight
                     ? 1 - (dist / rowHeight) * (1 - 0.38)
                     : dist <= rowHeight * 2
