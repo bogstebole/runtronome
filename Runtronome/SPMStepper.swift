@@ -11,6 +11,11 @@ struct SPMStepper: View {
     private let baseline = 160
 
     @State private var repeatTimer: Timer?
+    /// Tap-to-type state for the centre value. Kept separate from focus so the
+    /// TextField exists before focus is requested (see NumberField for why).
+    @State private var isEditing = false
+    @State private var text = ""
+    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -22,22 +27,54 @@ struct SPMStepper: View {
         .onDisappear(perform: stopRepeating)
     }
 
-    // MARK: Value display
+    // MARK: Value display (tap to type an exact cadence)
 
     private var valueLabel: some View {
         VStack(spacing: 1) {
-            Text(value.map(String.init) ?? "—")
-                .font(.anton(size: 24))
-                .foregroundColor(value == nil ? Theme.textTertiary : Theme.textPrimary)
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(.snappy(duration: 0.18), value: value)
+            Group {
+                if isEditing {
+                    TextField("", text: $text)
+                        .font(.anton(size: 24))
+                        .foregroundColor(Theme.textPrimary)
+                        .tint(Theme.textPrimary)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.center)
+                        .focused($focused)
+                        .onAppear { DispatchQueue.main.async { focused = true } }
+                } else {
+                    Text(value.map(String.init) ?? "—")
+                        .font(.anton(size: 24))
+                        .foregroundColor(value == nil ? Theme.textTertiary : Theme.textPrimary)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .animation(.snappy(duration: 0.18), value: value)
+                }
+            }
+            .frame(height: 28)
+
             Text("SPM")
                 .font(.momoTrust(size: 9, weight: .regular))
                 .tracking(1.2)
                 .foregroundColor(Theme.textTertiary)
         }
         .frame(width: 58)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            text = value.map(String.init) ?? ""
+            isEditing = true
+        }
+        .onChange(of: focused) { _, isFocused in
+            if isEditing, !isFocused { commitTyped() }
+        }
+    }
+
+    /// Empty input keeps the current value; typed input is clamped to range.
+    private func commitTyped() {
+        let digits = text.filter(\.isNumber)
+        if !digits.isEmpty {
+            value = min(max(Int(digits) ?? range.lowerBound, range.lowerBound), range.upperBound)
+        }
+        isEditing = false
     }
 
     // MARK: Step button
