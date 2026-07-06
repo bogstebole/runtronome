@@ -12,8 +12,11 @@ struct NumberField<Field: Hashable>: View {
     var field: Field
 
     @State private var text = ""
-
-    private var isEditing: Bool { focused.wrappedValue == field }
+    /// Drives which subview renders. Deliberately separate from the focus
+    /// binding: the TextField must exist in the hierarchy *before* focus is
+    /// requested (from its onAppear) — requesting focus for a not-yet-rendered
+    /// field gets reverted by the system and the tap appears dead.
+    @State private var isEditing = false
 
     var body: some View {
         VStack(spacing: 2) {
@@ -26,6 +29,9 @@ struct NumberField<Field: Hashable>: View {
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.center)
                         .focused(focused, equals: field)
+                        .onAppear {
+                            DispatchQueue.main.async { focused.wrappedValue = field }
+                        }
                 } else {
                     Text(value.map(String.init) ?? "—")
                         .font(.anton(size: 22))
@@ -52,20 +58,23 @@ struct NumberField<Field: Hashable>: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
+            guard !isEditing else { return }
             text = value.map(String.init) ?? ""
-            focused.wrappedValue = field
+            isEditing = true
         }
-        .onChange(of: isEditing) { _, editing in
-            if !editing { commitTyped() }
+        .onChange(of: focused.wrappedValue) { _, current in
+            // Focus moved elsewhere (Done, another field, tap away) → commit.
+            if isEditing, current != field {
+                commitTyped()
+                isEditing = false
+            }
         }
     }
 
+    /// Empty input cancels — it never clears an existing value.
     private func commitTyped() {
         let digits = text.filter(\.isNumber)
-        if digits.isEmpty {
-            value = nil
-        } else {
-            value = min(max(Int(digits) ?? range.lowerBound, range.lowerBound), range.upperBound)
-        }
+        guard !digits.isEmpty else { return }
+        value = min(max(Int(digits) ?? range.lowerBound, range.lowerBound), range.upperBound)
     }
 }
