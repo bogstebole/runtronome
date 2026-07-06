@@ -12,10 +12,14 @@ struct PlansFlowView: View {
     private enum Mode: Equatable {
         case list
         case build(WorkoutPlan?)   // nil = new plan
+        case sync                  // Garmin Connect login + fetch
+        case assign                // per-phase SPM assignment for a synced plan
     }
 
     @State private var plans: [WorkoutPlan] = PlanStore.load()
     @State private var mode: Mode = .list
+    /// The freshly synced plan being assigned cadences in `.assign` mode.
+    @State private var syncedPlan: WorkoutPlan?
 
     var body: some View {
         ZStack {
@@ -37,6 +41,30 @@ struct PlansFlowView: View {
                     }
                 )
                 .transition(.opacity)
+
+            case .sync:
+                GarminSyncView(
+                    onBack: { withAnimation(.easeInOut(duration: 0.2)) { mode = .list } },
+                    onFetched: { plan in
+                        syncedPlan = plan
+                        withAnimation(.easeInOut(duration: 0.2)) { mode = .assign }
+                    }
+                )
+                .transition(.opacity)
+
+            case .assign:
+                if let binding = Binding($syncedPlan) {
+                    PhaseEditorView(
+                        plan: binding,
+                        onBack: { withAnimation(.easeInOut(duration: 0.2)) { mode = .sync } },
+                        onSaveStart: { configured in
+                            plans = PlanStore.upsert(configured)
+                            onApply(configured)
+                            onClose()
+                        }
+                    )
+                    .transition(.opacity)
+                }
             }
         }
     }
@@ -76,15 +104,27 @@ struct PlansFlowView: View {
                 .scrollContentBackground(.hidden)
             }
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { mode = .build(nil) }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "plus").font(.system(size: 13, weight: .bold))
-                    Text("NEW PLAN")
+            VStack(spacing: 10) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { mode = .sync }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.down").font(.system(size: 13, weight: .bold))
+                        Text("SYNC FROM GARMIN")
+                    }
                 }
+                .buttonStyle(.app(.secondary))
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { mode = .build(nil) }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus").font(.system(size: 13, weight: .bold))
+                        Text("NEW PLAN")
+                    }
+                }
+                .buttonStyle(.app(.primary))
             }
-            .buttonStyle(.app(.primary))
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
         }
