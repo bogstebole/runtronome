@@ -5,8 +5,6 @@ struct RuntronomeButton: View {
     enum Style {
         case circular(systemImage: String)
         case pill(text: String)
-        /// Full-width high-contrast call to action (e.g. "Sync", "Save & Start").
-        case primary(text: String, systemImage: String? = nil, loading: Bool = false)
     }
 
     var style: Style
@@ -24,32 +22,12 @@ struct RuntronomeButton: View {
             }
         case .pill(let text):
             Text(text)
-                .font(.momoTrust(size: 13, weight: .semibold))
+                .font(.momoTrust(size: 12, weight: .bold))
+                .tracking(1.5)
                 .foregroundColor(.white)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 9)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(white: 0.28))
-                )
-
-        case .primary(let text, let systemImage, let loading):
-            HStack(spacing: 10) {
-                if loading {
-                    SyncSpinner(color: Theme.ctaLabel, size: 18, lineWidth: 2.2)
-                } else {
-                    if let systemImage {
-                        Image(systemName: systemImage)
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    Text(text)
-                        .font(.momoTrust(size: 15, weight: .semibold))
-                }
-            }
-            .foregroundColor(Theme.ctaLabel)
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.ctaFill))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Rectangle().fill(Color(white: 0.28)))
         }
     }
 }

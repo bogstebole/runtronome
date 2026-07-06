@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Summary card shown on the sync screen once a workout is fetched. Tapping it
-/// advances to the phase editor.
+/// advances to the phase editor. Flat Swiss sheet: hairline-framed, no rounding.
 struct WorkoutPlanCard: View {
     let plan: WorkoutPlan
     var onTap: () -> Void
@@ -15,47 +15,47 @@ struct WorkoutPlanCard: View {
     private var contextLine: String {
         [plan.location.uppercased(), plan.temperature, Self.dateFormatter.string(from: plan.date).uppercased()]
             .filter { !$0.isEmpty }
-            .joined(separator: "  –  ")
+            .joined(separator: " · ")
     }
 
     private var summaryLine: String {
         let phaseCount = "\(plan.phases.count) PHASES"
         let minutes = plan.estimatedMinutes
-        return minutes > 0 ? "\(phaseCount)  ·  ~\(minutes) MIN" : phaseCount
+        return minutes > 0 ? "\(phaseCount) · ~\(minutes) MIN" : phaseCount
     }
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(plan.title)
-                        .font(.momoTrust(size: 20, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                    Text(contextLine)
-                        .font(.momoTrust(size: 11, weight: .regular))
-                        .foregroundColor(Theme.textSecondary)
-                }
+            VStack(alignment: .leading, spacing: 0) {
+                Text(plan.title.uppercased())
+                    .font(.anton(size: 24))
+                    .foregroundColor(Theme.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .padding(.bottom, 8)
 
-                Rectangle()
-                    .fill(Theme.stroke)
-                    .frame(height: 1)
+                MetaLabel(text: contextLine)
+                    .padding(.bottom, 16)
+
+                Hairline()
 
                 HStack {
-                    Text(summaryLine)
-                        .font(.momoTrust(size: 11, weight: .regular))
-                        .foregroundColor(Theme.textTertiary)
+                    MetaLabel(text: summaryLine, color: Theme.textTertiary)
                     Spacer()
-                    Text("SET PACE")
-                        .font(.momoTrust(size: 11, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
+                    HStack(spacing: 6) {
+                        Text("SET PACE")
+                            .font(.momoTrust(size: 11, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundColor(Theme.textPrimary)
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(Theme.textPrimary)
+                    }
                 }
+                .padding(.top, 14)
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surface))
+            .background(Rectangle().fill(Theme.surface))
         }
         .buttonStyle(PressableButtonStyle())
     }

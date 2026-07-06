@@ -19,7 +19,7 @@ struct SyncView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-                .padding(.top, 72)
+                .padding(.top, 18)
                 .padding(.horizontal, 24)
 
             Spacer()
@@ -31,20 +31,28 @@ struct SyncView: View {
 
             footer
                 .padding(.horizontal, 24)
-                .padding(.bottom, 48)
+                .padding(.bottom, 40)
         }
     }
 
     // MARK: Header
 
     private var header: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
+            MastheadRule()
+
             Text("WORKOUT SYNC")
-                .font(.momoTrust(size: 11, weight: .regular))
-                .foregroundColor(Theme.textTertiary)
-            Text("Pull today's plan")
-                .font(.momoTrust(size: 24, weight: .semibold))
+                .font(.anton(size: 30))
                 .foregroundColor(Theme.textPrimary)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack {
+                MetaLabel(text: "PULL TODAY'S PLAN")
+                Spacer()
+                MetaLabel(text: "GARMIN / HEALTH")
+            }
+            .padding(.bottom, 12)
         }
     }
 
@@ -106,24 +114,21 @@ struct SyncView: View {
         switch phase {
         case .loaded:
             // Quietly allow a re-sync once a plan is shown.
-            Button(action: sync) {
-                Text("SYNC AGAIN")
-                    .font(.momoTrust(size: 12, weight: .semibold))
-                    .foregroundColor(Theme.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-            }
-            .buttonStyle(PressableButtonStyle())
+            Button("SYNC AGAIN", action: sync)
+                .buttonStyle(.app(.secondary))
 
         default:
             Button(action: sync) {
-                RuntronomeButton(style: .primary(
-                    text: isFailed ? "TRY AGAIN" : "SYNC WITH GARMIN / HEALTH",
-                    systemImage: "arrow.down.circle",
-                    loading: phase == .loading
-                ))
+                if phase == .loading {
+                    SyncSpinner(color: Theme.ctaLabel, size: 18, lineWidth: 2.2)
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.down.circle").font(.system(size: 15, weight: .semibold))
+                        Text(isFailed ? "TRY AGAIN" : "SYNC WITH GARMIN / HEALTH")
+                    }
+                }
             }
-            .buttonStyle(PressableButtonStyle())
+            .buttonStyle(.app(.primary))
             .disabled(phase == .loading)
         }
     }

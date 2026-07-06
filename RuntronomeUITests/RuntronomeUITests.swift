@@ -35,9 +35,31 @@ final class RuntronomeUITests: XCTestCase {
 
     @MainActor
     func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
+        let app = XCUIApplication()
+        app.activate()
+        XCUIDevice.shared.press(.home)
+        
+        let springboardApp = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        springboardApp/*@START_MENU_TOKEN@*/.images["record.circle"]/*[[".otherElements",".images[\"Screen Recording\"]",".images[\"record.circle\"]",".images"],[[[-1,2],[-1,1],[-1,3],[-1,0,1]],[[-1,2],[-1,1]]],[0]]@END_MENU_TOKEN@*/.firstMatch.tap()
+        
+        let elementsQuery = springboardApp.otherElements
+        elementsQuery/*@START_MENU_TOKEN@*/.containing(.image, identifier: "record.circle").firstMatch/*[[".element(boundBy: 86)",".containing(.image, identifier: \"record.circle\").firstMatch"],[[[-1,1],[-1,0]]],[0]]@END_MENU_TOKEN@*/.doubleTap()
+        
+        app.activate()
+        app.windows/*@START_MENU_TOKEN@*/.firstMatch/*[[".containing(.other, identifier: nil).firstMatch",".firstMatch"],[[[-1,1],[-1,0]]],[0]]@END_MENU_TOKEN@*/.swipeUp()
+        XCUIDevice.shared.press(.home)
+        springboardApp.statusBars/*@START_MENU_TOKEN@*/.containing(.other, identifier: nil).firstMatch/*[[".element(boundBy: 0)",".containing(.staticText, identifier: \"23:14\").firstMatch",".containing(.other, identifier: nil).firstMatch"],[[[-1,2],[-1,1],[-1,0]]],[0]]@END_MENU_TOKEN@*/.swipeDown()
+        springboardApp/*@START_MENU_TOKEN@*/.collectionViews["Route Picker Items"].firstMatch/*[[".otherElements.collectionViews[\"Route Picker Items\"].firstMatch",".collectionViews",".containing(.other, identifier: \"Horizontal scroll bar, 1 page\").firstMatch",".containing(.other, identifier: \"Vertical scroll bar, 1 page\").firstMatch",".firstMatch",".collectionViews[\"Route Picker Items\"].firstMatch"],[[[-1,5],[-1,1,1],[-1,0]],[[-1,4],[-1,3],[-1,2]]],[0]]@END_MENU_TOKEN@*/.tap()
+        elementsQuery.element(boundBy: 65).tap()
+        
+        let element = springboardApp/*@START_MENU_TOKEN@*/.images["record.circle"]/*[[".otherElements[\"regular.view\"].images",".otherElements",".images[\"Screen Recording\"]",".images[\"record.circle\"]"],[[[-1,3],[-1,2],[-1,1,1],[-1,0]],[[-1,3],[-1,2]]],[0]]@END_MENU_TOKEN@*/.firstMatch
+        element/*@START_MENU_TOKEN@*/.press(forDuration: 0.5)/*[[".tap()",".press(forDuration: 0.5)"],[[[-1,1],[-1,0]]],[0]]@END_MENU_TOKEN@*/
+        
+        let element2 = elementsQuery.element(boundBy: 70)
+        element2.doubleTap()
+        element.tap()
+        element2.tap()
+
+        app.launch()
     }
 }

@@ -10,6 +10,11 @@ enum AlertFrequency: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Footer/status wording, e.g. "EVERY OTHER STEP".
+    var displayLabel: String {
+        self == .everyStep ? rawValue : "\(rawValue) STEP"
+    }
+
     var stepInterval: Int {
         switch self {
         case .everyStep:  return 1

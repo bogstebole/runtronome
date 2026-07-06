@@ -11,14 +11,13 @@ struct PhaseEditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-                .padding(.top, 64)
+                .padding(.top, 18)
                 .padding(.horizontal, 24)
-                .padding(.bottom, 20)
 
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 10) {
-                    ForEach($plan.phases) { $phase in
-                        PhaseRow(phase: $phase)
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(plan.phases.enumerated()), id: \.element.id) { index, _ in
+                        PhaseRow(index: index, phase: $plan.phases[index])
                     }
                 }
                 .padding(.horizontal, 24)
@@ -27,41 +26,53 @@ struct PhaseEditorView: View {
 
             footer
                 .padding(.horizontal, 24)
-                .padding(.bottom, 48)
+                .padding(.bottom, 40)
         }
     }
 
     // MARK: Header
 
     private var header: some View {
-        VStack(spacing: 16) {
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            MastheadRule()
+
+            HStack(alignment: .center) {
                 Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Theme.textPrimary)
-                        .frame(width: 40, height: 40)
-                        .background(Circle().fill(Theme.control))
-                        .contentShape(Circle())
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.left")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("BACK")
+                            .font(.momoTrust(size: 11, weight: .bold))
+                            .tracking(1.5)
+                    }
+                    .foregroundColor(Theme.textSecondary)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(PressableButtonStyle())
+                .buttonStyle(.plain)
 
                 Spacer()
 
-                Text("\(plan.assignedCount)/\(plan.phases.count) SET")
-                    .font(.momoTrust(size: 11, weight: .regular))
-                    .foregroundColor(Theme.textTertiary)
+                MetaLabel(text: "\(plan.assignedCount)/\(plan.phases.count) SET",
+                          color: plan.allAssigned ? Theme.textPrimary : Theme.textSecondary)
             }
+            .padding(.vertical, 12)
 
-            VStack(spacing: 6) {
-                Text("SET YOUR CADENCE")
-                    .font(.momoTrust(size: 11, weight: .regular))
-                    .foregroundColor(Theme.textTertiary)
-                Text(plan.title)
-                    .font(.momoTrust(size: 22, weight: .semibold))
-                    .foregroundColor(Theme.textPrimary)
-                    .multilineTextAlignment(.center)
+            Text(plan.title.uppercased())
+                .font(.anton(size: 30))
+                .foregroundColor(Theme.textPrimary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack {
+                MetaLabel(text: "SET YOUR CADENCE")
+                Spacer()
+                MetaLabel(text: "SPM PER PHASE", color: Theme.textTertiary)
             }
+            .padding(.bottom, 14)
+
+            Hairline()
         }
     }
 
@@ -71,39 +82,46 @@ struct PhaseEditorView: View {
         Button {
             onSaveStart(plan)
         } label: {
-            RuntronomeButton(style: .primary(text: "SAVE & START", systemImage: "play.fill"))
+            HStack(spacing: 10) {
+                Image(systemName: "play.fill").font(.system(size: 13, weight: .bold))
+                Text("SAVE & START")
+            }
         }
-        .buttonStyle(PressableButtonStyle())
+        .buttonStyle(.app(.primary))
     }
 }
 
-/// A single phase row: name + goal on the left, custom SPM stepper on the right.
+/// A single phase row on the sheet: numbered index + name + goal on the left,
+/// custom SPM stepper on the right, hairline underneath. The index lights up
+/// once a cadence is assigned.
 private struct PhaseRow: View {
+    let index: Int
     @Binding var phase: WorkoutPhase
 
     var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(phase.title)
-                    .font(.momoTrust(size: 16, weight: .medium))
-                    .foregroundColor(Theme.textPrimary)
-                Text(phase.goal.display)
-                    .font(.momoTrust(size: 12, weight: .regular))
-                    .foregroundColor(Theme.textSecondary)
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                Text(String(format: "%02d", index + 1))
+                    .font(.anton(size: 20))
+                    .foregroundColor(phase.isAssigned ? Theme.textPrimary : Theme.railFar)
+                    .frame(width: 34, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(phase.title.uppercased())
+                        .font(.momoTrust(size: 14, weight: .medium))
+                        .tracking(1.0)
+                        .foregroundColor(Theme.textPrimary)
+                    MetaLabel(text: phase.goal.display.uppercased(), color: Theme.textTertiary)
+                }
+
+                Spacer(minLength: 12)
+
+                SPMStepper(value: $phase.targetSPM)
             }
+            .padding(.vertical, 14)
 
-            Spacer(minLength: 12)
-
-            SPMStepper(value: $phase.targetSPM)
+            Hairline()
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 18)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.surface))
-        .overlay(
-            // Subtle left accent that brightens once a cadence is assigned.
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(phase.isAssigned ? Theme.textPrimary.opacity(0.25) : .clear, lineWidth: 1)
-        )
         .animation(.easeInOut(duration: 0.2), value: phase.isAssigned)
     }
 }

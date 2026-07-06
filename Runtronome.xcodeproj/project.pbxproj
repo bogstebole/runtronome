@@ -106,8 +106,8 @@
 		E84184D42FE9D036003C48DD /* RuntronomeWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				E84184E32FE9D037003C48DD /* Exceptions for "RuntronomeWidget" folder in "RuntronomeWidgetExtension" target */,
 				E8AA00012FE9D7F4003C48DD /* Exceptions for "RuntronomeWidget" folder in "Runtronome" target */,
+				E84184E32FE9D037003C48DD /* Exceptions for "RuntronomeWidget" folder in "RuntronomeWidgetExtension" target */,
 			);
 			path = RuntronomeWidget;
 			sourceTree = "<group>";

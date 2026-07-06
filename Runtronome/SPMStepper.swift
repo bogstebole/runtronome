@@ -27,13 +27,14 @@ struct SPMStepper: View {
     private var valueLabel: some View {
         VStack(spacing: 1) {
             Text(value.map(String.init) ?? "—")
-                .font(.momoTrust(size: 26, weight: .semibold))
+                .font(.anton(size: 24))
                 .foregroundColor(value == nil ? Theme.textTertiary : Theme.textPrimary)
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .animation(.snappy(duration: 0.18), value: value)
             Text("SPM")
                 .font(.momoTrust(size: 9, weight: .regular))
+                .tracking(1.2)
                 .foregroundColor(Theme.textTertiary)
         }
         .frame(width: 58)
@@ -46,8 +47,8 @@ struct SPMStepper: View {
             .font(.system(size: 15, weight: .semibold))
             .foregroundColor(Theme.textPrimary)
             .frame(width: 40, height: 40)
-            .background(Circle().fill(Theme.control))
-            .contentShape(Circle())
+            .background(Rectangle().fill(Theme.control))
+            .contentShape(Rectangle())
             // DragGesture(minimumDistance: 0) gives us press-down + release so we
             // can fire once immediately and then repeat while held.
             .gesture(

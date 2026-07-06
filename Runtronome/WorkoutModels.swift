@@ -11,7 +11,9 @@ import Foundation
 enum PhaseGoal: Codable, Equatable {
     case time(seconds: Int)
     case distance(meters: Int)
-    case open
+    /// A hold: the metronome falls silent until the runner taps to continue
+    /// (Garmin's "lap button press" rest).
+    case pause
 
     /// Human-readable goal, e.g. "10 min", "800 m", "1.5 km", "Open".
     var display: String {
@@ -25,8 +27,8 @@ enum PhaseGoal: Codable, Equatable {
                 return String(format: "%.1f km", Double(meters) / 1000)
             }
             return "\(meters) m"
-        case .open:
-            return "Open"
+        case .pause:
+            return "Pause"
         }
     }
 }
@@ -55,6 +57,60 @@ struct WorkoutPhase: Identifiable, Codable, Equatable {
     var isAssigned: Bool { (targetSPM ?? 0) > 0 }
 }
 
+/// A repeat block (Garmin-style): perform `work`, then `rest`, `rounds` times.
+struct RepeatBlock: Identifiable, Codable, Equatable {
+    let id: UUID
+    var title: String
+    var work: WorkoutPhase
+    var rest: WorkoutPhase
+    var rounds: Int
+
+    init(id: UUID = UUID(), title: String, work: WorkoutPhase, rest: WorkoutPhase, rounds: Int) {
+        self.id = id
+        self.title = title
+        self.work = work
+        self.rest = rest
+        self.rounds = rounds
+    }
+
+    var expandedPhases: [WorkoutPhase] {
+        (1...max(rounds, 1)).flatMap { round in
+            [numbered(work, round), numbered(rest, round)]
+        }
+    }
+
+    /// Fresh-identity copy whose title carries the round number (e.g. "Work 3").
+    private func numbered(_ phase: WorkoutPhase, _ round: Int) -> WorkoutPhase {
+        WorkoutPhase(title: "\(phase.title) \(round)", goal: phase.goal, targetSPM: phase.targetSPM, note: phase.note)
+    }
+}
+
+/// An ordered piece of a workout: a single step, or a repeat block. A workout is
+/// a free mix of these — warm up, a drill block, intervals, cool down, in any order.
+enum WorkoutElement: Identifiable, Codable, Equatable {
+    case step(WorkoutPhase)
+    case block(RepeatBlock)
+
+    var id: UUID {
+        switch self {
+        case .step(let phase): return phase.id
+        case .block(let block): return block.id
+        }
+    }
+
+    var expandedPhases: [WorkoutPhase] {
+        switch self {
+        case .step(let phase): return [phase]
+        case .block(let block): return block.expandedPhases
+        }
+    }
+}
+
+extension Array where Element == WorkoutElement {
+    /// Flatten the structure into the ordered phases the metronome runs.
+    var expandedPhases: [WorkoutPhase] { flatMap(\.expandedPhases) }
+}
+
 /// A full day's structured workout.
 struct WorkoutPlan: Identifiable, Codable, Equatable {
     let id: UUID
@@ -62,6 +118,10 @@ struct WorkoutPlan: Identifiable, Codable, Equatable {
     let date: Date
     let location: String
     let temperature: String
+    /// Structured elements (steps + repeat blocks) for re-editing; optional so
+    /// mock/HealthKit payloads decode without it. `phases` always holds the
+    /// expanded, runnable sequence the metronome plays.
+    var elements: [WorkoutElement]?
     var phases: [WorkoutPhase]
 
     init(
@@ -70,6 +130,7 @@ struct WorkoutPlan: Identifiable, Codable, Equatable {
         date: Date,
         location: String,
         temperature: String,
+        elements: [WorkoutElement]? = nil,
         phases: [WorkoutPhase]
     ) {
         self.id = id
@@ -77,6 +138,7 @@ struct WorkoutPlan: Identifiable, Codable, Equatable {
         self.date = date
         self.location = location
         self.temperature = temperature
+        self.elements = elements
         self.phases = phases
     }
 

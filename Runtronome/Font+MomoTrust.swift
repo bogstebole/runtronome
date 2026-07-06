@@ -22,6 +22,11 @@ extension Font {
     static func momoTrust(size: CGFloat, weight: UIFont.Weight = .regular) -> Font {
         Font(UIFont.momoTrust(size: size, weight: weight))
     }
+
+    /// Anton — heavy condensed display face for poster headlines and big numerals.
+    static func anton(size: CGFloat) -> Font {
+        .custom("Anton-Regular", size: size)
+    }
 }
 
 // MARK: - UIFont Extension

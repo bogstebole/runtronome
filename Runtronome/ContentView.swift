@@ -12,7 +12,8 @@ struct ContentView: View {
     @State private var plan: WorkoutPlan?
 
     @State private var spm: Double = 175
-    @State private var isPlaying = false
+    @State private var isPlaying = false      // metronome ticking
+    @State private var isPaused = false       // session active but held
     @State private var alertFrequency: AlertFrequency = .everyOther
     @State private var totalSteps = 0
     @State private var stepCount = 0
@@ -20,7 +21,6 @@ struct ContentView: View {
     @State private var currentTime = Date()
     @State private var clockTimer: Timer?
     @State private var hapticTrigger = 0
-    @State private var isSliderActive = false
     @State private var isEditingSPM = false
     @State private var spmInputText = ""
     @State private var showingBuilder = false
@@ -35,12 +35,19 @@ struct ContentView: View {
     @FocusState private var spmFieldFocused: Bool
 
     /// Single entry point — the sync flow injects the chosen workout/cadence here.
+    /// With no injected plan, the last plan loaded from the library is restored.
     init(configuration: MetronomeConfiguration = .default) {
-        _trainingTitle = State(initialValue: configuration.trainingTitle)
-        _phaseLabel = State(initialValue: configuration.phaseLabel)
-        _isGarminConnected = State(initialValue: configuration.isGarminConnected)
-        _spm = State(initialValue: Double(configuration.startingSPM))
-        _plan = State(initialValue: configuration.plan)
+        var config = configuration
+        if config.plan == nil,
+           let id = PlanStore.lastActiveID,
+           let saved = PlanStore.load().first(where: { $0.id == id }) {
+            config = MetronomeConfiguration(plan: saved)
+        }
+        _trainingTitle = State(initialValue: config.trainingTitle)
+        _phaseLabel = State(initialValue: config.phaseLabel)
+        _isGarminConnected = State(initialValue: config.isGarminConnected)
+        _spm = State(initialValue: Double(config.startingSPM))
+        _plan = State(initialValue: config.plan)
     }
 
     private static let sound = MetronomeSound()
@@ -56,10 +63,11 @@ struct ContentView: View {
     private var timeString: String { ContentView.timeFormatter.string(from: currentTime) }
     private var dayDateString: String { ContentView.dayDateFormatter.string(from: currentTime).uppercased() }
 
-    private var contextLine: String {
-        [locationService.city, locationService.temperature, timeString, dayDateString]
+    /// Right side of the context row: "BELGRADE · 21° · 17:37".
+    private var contextRight: String {
+        [locationService.city.uppercased(), locationService.temperature, timeString]
             .filter { !$0.isEmpty }
-            .joined(separator: "  –  ")
+            .joined(separator: " · ")
     }
 
     // MARK: Phase state
@@ -81,24 +89,17 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.165).ignoresSafeArea()
+            Theme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 headerView
-                    .scaleEffect(isSliderActive ? 0.85 : 1.0)
-                    .opacity(isSliderActive ? 0.5 : 1.0)
-                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSliderActive)
                 Spacer()
-                centralView
-                    .scaleEffect(isSliderActive ? 0.85 : 1.0)
-                    .opacity(isSliderActive ? 0.5 : 1.0)
-                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSliderActive)
+                cadenceRail
                 Spacer()
                 footerView
             }
-            .overlay(alignment: .topTrailing) { planButton }
-            .scaleEffect(isPickingFrequency ? 0.85 : 1.0)
-            .blur(radius: isPickingFrequency ? 18 : 0)
+            .padding(.horizontal, 24)
+            .blur(radius: isPickingFrequency ? 10 : 0)
             .allowsHitTesting(!isPickingFrequency)
 
             frequencyOverlay
@@ -107,7 +108,7 @@ struct ContentView: View {
         .onAppear { setup() }
         .onDisappear { teardown() }
         .onChange(of: spm) { _, _ in
-            guard !isSliderActive && !isEditingSPM else { return }
+            guard !isEditingSPM else { return }
             syncWidget()
             if isPlaying { restartMetronome(); updateLiveActivity() }
         }
@@ -115,241 +116,395 @@ struct ContentView: View {
         .onChange(of: phaseLabel) { _, _ in syncWidget(); if isPlaying { updateLiveActivity() } }
         .onChange(of: isGarminConnected) { _, _ in syncWidget() }
         .fullScreenCover(isPresented: $showingBuilder) {
-            ManualPlanBuilderView(
-                onCancel: { showingBuilder = false },
-                onSave: { plan in
-                    applyPlan(plan)
-                    showingBuilder = false
-                }
+            PlansFlowView(
+                activePlanID: plan?.id,
+                onApply: { applyPlan($0) },
+                onClose: { showingBuilder = false }
             )
         }
     }
 
-    // MARK: Subviews
-
-    /// Top-right affordance to open the manual plan builder.
-    private var planButton: some View {
-        Button { showingBuilder = true } label: {
-            Image(systemName: "square.and.pencil")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(.white)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(Color(white: 0.28)))
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .padding(.top, 8)
-        .padding(.trailing, 20)
-        .opacity(isSliderActive ? 0 : 1)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSliderActive)
-    }
+    // MARK: Header (masthead + phase block + context row)
 
     private var headerView: some View {
-        VStack(spacing: 6) {
-            if isGarminConnected {
-                Text(trainingTitle)
-                    .font(.momoTrust(size: 16, weight: .medium))
-                    .foregroundColor(.white)
+        VStack(alignment: .leading, spacing: 0) {
+            MastheadRule()
+
+            // No plan loaded → no title; the masthead stays a clean rule + context.
+            if plan != nil {
+                Text(trainingTitle.uppercased())
+                    .font(.anton(size: 30))
+                    .foregroundColor(Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text(contextLine)
-                .font(.momoTrust(size: 11, weight: .regular))
-                .foregroundColor(Color(white: 0.5))
+
+            phaseBlock
+
+            contextRow
         }
-        .padding(.top, 56)
-        .padding(.horizontal, 24)
+        .padding(.top, 18)
     }
 
-    private var centralView: some View {
-        VStack(spacing: 0) {
-            phaseHeader
-
-            Group {
-                if isEditingSPM {
-                    TextField("", text: $spmInputText)
-                        .font(.momoTrust(size: 130, weight: .bold))
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
-                        .keyboardType(.numberPad)
-                        .focused($spmFieldFocused)
-                        .toolbar {
-                            ToolbarItemGroup(placement: .keyboard) {
-                                Spacer()
-                                Button("Done") { commitSPMEdit() }
-                                    .font(.momoTrust(size: 16, weight: .medium))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                } else {
-                    Text("\(Int(spm))")
-                        .font(.momoTrust(size: 130, weight: .bold))
-                        .foregroundColor(.white)
-                        .onTapGesture {
-                            spmInputText = "\(Int(spm))"
-                            isEditingSPM = true
-                            spmFieldFocused = true
-                        }
-                }
-            }
-            .padding(.bottom, 20)
-            .onChange(of: spmFieldFocused) { _, focused in
-                if !focused { commitSPMEdit() }
-            }
-
-            Button {
-                withAnimation(freqSpring) { isPickingFrequency = true }
-            } label: {
-                RuntronomeButton(style: .pill(text: alertFrequency.rawValue))
-            }
-            .buttonStyle(.plain)
-            .padding(.bottom, 12)
-
-            Text("SPM")
-                .font(.momoTrust(size: 11, weight: .regular))
-                .foregroundColor(Color(white: 0.45))
-        }
-    }
-
-    private var footerView: some View {
-        VStack(spacing: 16) {
-            Text("\(totalSteps.formatted(.number)) TOTAL STEPS")
-                .font(.momoTrust(size: 11, weight: .regular))
-                .foregroundColor(Color(white: 0.45))
-                .scaleEffect(isSliderActive ? 0.85 : 1.0)
-                .opacity(isSliderActive ? 0.5 : 1.0)
-                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSliderActive)
-
-            HStack(spacing: 0) {
-                Button(action: togglePlayback) {
-                    RuntronomeButton(style: .circular(systemImage: isPlaying ? "pause.fill" : "play.fill"))
-                }
-                .buttonStyle(.plain)
-                .frame(width: isSliderActive ? 0 : 52, height: 52)
-                .clipped()
-                .padding(.trailing, isSliderActive ? 0 : 16)
-
-                SPMSlider(value: $spm, range: 0...300, isActive: $isSliderActive)
-                    .onChange(of: isSliderActive) { _, active in
-                        if !active {
-                            syncWidget()
-                            if isPlaying { restartMetronome(); updateLiveActivity() }
-                        }
-                    }
-            }
-            .padding(.horizontal, isSliderActive ? 40 : 20)
-            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isSliderActive)
-        }
-        .padding(.bottom, 48)
-    }
-
-    // MARK: Phase progress UI
-
-    /// Current phase name + countdown/distance + what's next. Falls back to the
-    /// plain phase label when no structured plan is loaded.
+    /// Phase name + goal value + what's next. While idle it's a static preview
+    /// of the loaded plan's first phase; once running it carries the live
+    /// countdown and the advance bar for pause/distance phases.
     @ViewBuilder
-    private var phaseHeader: some View {
+    private var phaseBlock: some View {
         if let phase = currentPhase {
-            VStack(spacing: 8) {
-                Text(phase.title.isEmpty ? "PHASE" : phase.title.uppercased())
-                    .font(.momoTrust(size: 12, weight: .regular))
-                    .foregroundColor(Color(white: 0.5))
-                phaseGoalView(phase)
-                if let next = nextPhase {
-                    Text("NEXT — \(next.title.isEmpty ? "PHASE" : next.title.uppercased())")
-                        .font(.momoTrust(size: 10, weight: .regular))
-                        .foregroundColor(Color(white: 0.38))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(phase.title.isEmpty ? "PHASE" : phase.title.uppercased())
+                        .font(.momoTrust(size: 14, weight: .medium))
+                        .tracking(1.2)
+                        .foregroundColor(Theme.textPrimary)
+                    Spacer()
+                    phaseGoalValue(phase)
                 }
+
+                if let next = nextPhase {
+                    Text("NEXT – \(nextSummary(next))")
+                        .font(.momoTrust(size: 12, weight: .regular))
+                        .tracking(1.2)
+                        .foregroundColor(Theme.textSecondary)
+                }
+
+                if !isIdle {
+                    phaseActionBar(phase)
+                }
+
+                Hairline().padding(.top, 10)
             }
-            .padding(.bottom, 16)
-        } else if isGarminConnected {
-            Text(phaseLabel)
-                .font(.momoTrust(size: 11, weight: .regular))
-                .foregroundColor(Color(white: 0.45))
-                .padding(.bottom, 6)
         }
     }
 
-    /// Timed phases show a countdown (auto-advances); distance/open phases show
-    /// the goal plus a manual NEXT control.
+    /// Timed phases show the goal while idle and the countdown once running;
+    /// distance phases the goal. Pause phases carry no value — their whole
+    /// row is the TAP TO CONTINUE bar below.
     @ViewBuilder
-    private func phaseGoalView(_ phase: WorkoutPhase) -> some View {
+    private func phaseGoalValue(_ phase: WorkoutPhase) -> some View {
         switch phase.goal {
         case .time:
-            Text(countdownString)
-                .font(.momoTrust(size: 22, weight: .semibold))
-                .foregroundColor(.white)
+            Text(isIdle ? phase.goal.display.uppercased() : countdownString)
+                .font(.momoTrust(size: 15, weight: .semibold))
+                .foregroundColor(Theme.textPrimary)
                 .monospacedDigit()
                 .contentTransition(.numericText())
         case .distance(let meters):
-            HStack(spacing: 12) {
-                Text("\(meters) M")
-                    .font(.momoTrust(size: 22, weight: .semibold))
-                    .foregroundColor(.white)
-                nextStepButton
-            }
-        case .open:
-            nextStepButton
+            Text("\(meters) M")
+                .font(.momoTrust(size: 15, weight: .semibold))
+                .foregroundColor(Theme.textPrimary)
+        case .pause:
+            EmptyView()
         }
     }
 
-    private var nextStepButton: some View {
+    private func nextSummary(_ next: WorkoutPhase) -> String {
+        let title = next.title.isEmpty ? "PHASE" : next.title.uppercased()
+        if case .pause = next.goal { return title }
+        return "\(title) \(next.goal.display.uppercased())"
+    }
+
+    /// Full-width advance bar: white TAP TO CONTINUE for pause phases (the
+    /// metronome is silent until tapped), black NEXT for distance phases
+    /// (you're running; tap when you finish). Timed phases auto-advance.
+    @ViewBuilder
+    private func phaseActionBar(_ phase: WorkoutPhase) -> some View {
+        switch phase.goal {
+        case .pause:
+            advanceBar("TAP TO CONTINUE", fill: Theme.ctaFill, label: Theme.ctaLabel)
+        case .distance:
+            advanceBar("NEXT", fill: Theme.ctaDark, label: .white)
+        case .time:
+            EmptyView()
+        }
+    }
+
+    private func advanceBar(_ title: String, fill: Color, label: Color) -> some View {
         Button { advancePhase() } label: {
-            HStack(spacing: 5) {
-                Text("NEXT").font(.momoTrust(size: 12, weight: .semibold))
-                Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+            HStack {
+                Text(title)
+                    .font(.anton(size: 15))
+                    .tracking(0.5)
+                Spacer()
+                Image(systemName: "play.fill")
+                    .font(.system(size: 14, weight: .bold))
             }
-            .foregroundColor(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(Capsule().fill(Color(white: 0.28)))
+            .foregroundColor(label)
+            .padding(.horizontal, 20)
+            .frame(height: 54)
+            .frame(maxWidth: .infinity)
+            .background(Rectangle().fill(fill))
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
+        .padding(.top, 8)
     }
 
-    // MARK: Frequency spread picker
+    private var contextRow: some View {
+        HStack {
+            MetaLabel(text: dayDateString)
+            Spacer()
+            MetaLabel(text: contextRight)
+        }
+        .padding(.vertical, 12)
+    }
 
-    private var freqSpring: Animation { .spring(response: 0.42, dampingFraction: 0.82) }
-    private var freqPillSpacing: CGFloat { 50 }
-    /// Pushes the fan down from screen centre so the selected pill sits roughly
-    /// on the frequency button (which lives just below the big SPM number).
-    private var freqFanOffset: CGFloat { 88 }
+    // MARK: Cadence rail
 
-    /// The options live "behind" the button: tapping fans them up/down from the
-    /// centre, the selected one staying put. Background dims; content blurs.
+    /// The poster centrepiece: the live SPM flanked by its faded neighbours,
+    /// like a tape counter frozen mid-scroll. Drag up/down to slide the value;
+    /// tap the centre number to type one.
+    private let wheelRange = 30...300
+    private let wheelRowHeight: CGFloat = 88
+    private let wheelHeight: CGFloat = 396
+    @State private var wheelSelection: Int?
+
+    @ViewBuilder
+    private var cadenceRail: some View {
+        if isEditingSPM {
+            spmEditor
+        } else {
+            spmWheel
+        }
+    }
+
+    /// A real wheel (like the system timer picker): the whole column scrolls
+    /// with your finger, decelerates, and snaps so the centre value is the
+    /// live SPM. Tap the centre number to type instead.
+    private var spmWheel: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(spacing: 0) {
+                ForEach(wheelRange, id: \.self) { value in
+                    wheelRow(value)
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollPosition(id: $wheelSelection, anchor: .center)
+        .scrollTargetBehavior(.viewAligned)
+        .safeAreaPadding(.vertical, (wheelHeight - wheelRowHeight) / 2)
+        .frame(height: wheelHeight)
+        .sensoryFeedback(.selection, trigger: wheelSelection)
+        .onAppear { wheelSelection = Int(spm) }
+        .onChange(of: wheelSelection) { _, selected in
+            if let selected, selected != Int(spm) { spm = Double(selected) }
+        }
+        .onChange(of: spm) { _, value in
+            // External changes (plan load, Live Activity buttons) move the wheel.
+            if wheelSelection != Int(value) { wheelSelection = Int(value) }
+        }
+    }
+
+    /// Every row is set at full display size, then scaled/faded/repositioned by
+    /// its distance from the centre to reproduce the original static rail
+    /// exactly: ±1 at 58pt/38% white sitting 98pt out, ±2 at 40pt/28% white
+    /// just 51pt further, nothing visible beyond. The curves are continuous so
+    /// rows morph through those keyframes while the wheel spins.
+    private func wheelRow(_ value: Int) -> some View {
+        let rowHeight = wheelRowHeight
+        return Text("\(value)")
+            .font(.anton(size: 140))
+            .foregroundColor(Theme.textPrimary)
+            .lineLimit(1)
+            .frame(height: rowHeight)
+            .visualEffect { content, proxy in
+                let container = proxy.bounds(of: .scrollView(axis: .vertical)) ?? .zero
+                let raw = proxy.frame(in: .scrollView(axis: .vertical)).midY - container.midY
+                // Measured empirically (see git history): with safeAreaPadding
+                // this coordinate pair reports exactly 2× the real distance.
+                let dist = abs(raw) / 2
+                let sign: CGFloat = raw < 0 ? -1 : 1
+
+                // Keyframes from the original poster rail:
+                // hero 140pt/100% → ±1 58pt/38% → ±2 40pt/28% → gone.
+                let scale = dist <= rowHeight
+                    ? 1 - (dist / rowHeight) * (1 - 0.414)
+                    : max(0.286, 0.414 - ((dist - rowHeight) / rowHeight) * (0.414 - 0.286))
+                let opacity = dist <= rowHeight
+                    ? 1 - (dist / rowHeight) * (1 - 0.38)
+                    : dist <= rowHeight * 2
+                        ? 0.38 - ((dist - rowHeight) / rowHeight) * (0.38 - 0.28)
+                        : max(0, 0.28 - (dist - rowHeight * 2) / 24 * 0.28)
+
+                // Remap positions to the poster's grouping: air around the
+                // hero (±1 reads 111pt out), tight pair at the edges (±2 only
+                // 56.5pt further). Offset must come after scaleEffect so the
+                // translation isn't scaled down.
+                let visualDist = dist <= rowHeight
+                    ? dist * (111 / rowHeight)
+                    : 111 + (dist - rowHeight) * (56.5 / rowHeight)
+
+                return content
+                    .scaleEffect(scale)
+                    .offset(y: sign * (visualDist - dist))
+                    .opacity(opacity)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if value == Int(spm) {
+                    spmInputText = "\(value)"
+                    isEditingSPM = true
+                    spmFieldFocused = true
+                } else {
+                    withAnimation(.snappy) { wheelSelection = value }
+                }
+            }
+    }
+
+    private var spmEditor: some View {
+        TextField("", text: $spmInputText)
+            .font(.anton(size: 140))
+            .foregroundColor(Theme.textPrimary)
+            .multilineTextAlignment(.center)
+            .keyboardType(.numberPad)
+            .focused($spmFieldFocused)
+            .frame(height: wheelHeight)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { commitSPMEdit() }
+                        .font(.momoTrust(size: 16, weight: .medium))
+                        .foregroundColor(.white)
+                }
+            }
+            .onChange(of: spmFieldFocused) { _, focused in
+                if !focused { commitSPMEdit() }
+            }
+    }
+
+    // MARK: Footer (hairline + status row + transport)
+
+    private var footerView: some View {
+        VStack(spacing: 0) {
+            Hairline()
+
+            HStack {
+                Button {
+                    withAnimation(freqSpring) { isPickingFrequency = true }
+                } label: {
+                    HStack(spacing: 6) {
+                        MetaLabel(text: alertFrequency.displayLabel)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(Theme.textTertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                MetaLabel(text: "\(totalSteps.formatted(.number)) TOTAL STEPS")
+            }
+            .padding(.vertical, 14)
+
+            transportButtons
+        }
+        .padding(.bottom, 20)
+    }
+
+    // MARK: Transport (START → PAUSE | FINISH)
+
+    private var isIdle: Bool { !isPlaying && !isPaused }
+
+    /// One big START rectangle that splits into PAUSE/RESUME + FINISH while a
+    /// session is active. The primary button is always present, so it animates
+    /// from full-width to half as the side button changes.
+    private var transportButtons: some View {
+        HStack(spacing: 10) {
+            // Left slot: new-plan button while idle, PAUSE/RESUME while active.
+            if isIdle {
+                newPlanButton
+            } else {
+                Button {
+                    withAnimation(.bouncy) { pauseResumeAction() }
+                } label: {
+                    transportIcon(isPaused ? "play.fill" : "pause.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.app(.secondary))
+                .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+
+            // Primary: play ⇄ stop. The symbol replaces in place (no cross-fade);
+            // the layout springs as the side button changes.
+            Button {
+                withAnimation(.bouncy) { primaryTransportAction() }
+            } label: {
+                transportIcon(isIdle ? "play.fill" : "stop.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.app(.primary))
+        }
+    }
+
+    /// Opens the manual plan builder. Sits left of START while idle; disappears
+    /// once a session starts.
+    private var newPlanButton: some View {
+        Button { showingBuilder = true } label: {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 60, height: 60)
+                .background(Rectangle().fill(Theme.ctaDark))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableButtonStyle())
+        .transition(.scale(scale: 0.9).combined(with: .opacity))
+    }
+
+    private func transportIcon(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 20, weight: .bold))
+            .contentTransition(.symbolEffect(.replace))
+    }
+
+    private func primaryTransportAction() {
+        if isIdle { startSession() } else { finishSession() }
+    }
+
+    private func pauseResumeAction() {
+        if isPaused { resumeSession() } else { pauseSession() }
+    }
+
+    // MARK: Frequency picker
+
+    private var freqSpring: Animation { .spring(response: 0.38, dampingFraction: 0.85) }
+
+    /// Options rise from the footer's frequency label — a flat stack of sharp
+    /// rectangles, the active one inverted. Background dims; content blurs.
     private var frequencyOverlay: some View {
-        ZStack {
+        ZStack(alignment: .bottomLeading) {
             Color.black
-                .opacity(isPickingFrequency ? 0.3 : 0)
+                .opacity(isPickingFrequency ? 0.45 : 0)
                 .ignoresSafeArea()
                 .onTapGesture { collapseFrequency() }
 
-            // The fan lives at the button's position (offset below centre) and
-            // its options spread out of that point.
-            ZStack {
-                let selectedIndex = AlertFrequency.allCases.firstIndex(of: alertFrequency) ?? 0
-                ForEach(Array(AlertFrequency.allCases.enumerated()), id: \.offset) { index, freq in
-                    let spread = CGFloat(index - selectedIndex) * freqPillSpacing
-                    freqPill(freq, isSelected: freq == alertFrequency)
-                        .offset(y: isPickingFrequency ? spread : 0)
-                        .opacity(isPickingFrequency ? 1 : 0)
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(AlertFrequency.allCases) { freq in
+                    freqOption(freq, isSelected: freq == alertFrequency)
                 }
             }
-            .offset(y: freqFanOffset)
+            .padding(.leading, 24)
+            .padding(.bottom, 110)
+            .opacity(isPickingFrequency ? 1 : 0)
+            .offset(y: isPickingFrequency ? 0 : 28)
         }
         .allowsHitTesting(isPickingFrequency)
     }
 
-    private func freqPill(_ freq: AlertFrequency, isSelected: Bool) -> some View {
+    private func freqOption(_ freq: AlertFrequency, isSelected: Bool) -> some View {
         Button { selectFrequency(freq) } label: {
-            Text(freq.rawValue)
-                .font(.momoTrust(size: 13, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.28)))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.white, lineWidth: isSelected ? 1.5 : 0)
-                )
+            Text(freq.displayLabel)
+                .font(.momoTrust(size: 12, weight: .bold))
+                .tracking(1.5)
+                .foregroundColor(isSelected ? Theme.ctaLabel : .white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+                .background(Rectangle().fill(isSelected ? Theme.ctaFill : Color(white: 0.24)))
         }
         .buttonStyle(.plain)
     }
@@ -365,8 +520,14 @@ struct ContentView: View {
 
     // MARK: Phase advance
 
+    private var isCurrentPhasePause: Bool {
+        if case .pause = currentPhase?.goal { return true }
+        return false
+    }
+
     /// Seed the metronome from the current phase: label, cadence, and (if timed)
-    /// the countdown.
+    /// the countdown. Re-syncs ticking so a pause phase falls silent and a normal
+    /// phase resumes — `restartMetronome()` itself respects the pause.
     private func applyCurrentPhase() {
         guard let phase = currentPhase else { return }
         phaseLabel = phase.title.uppercased()
@@ -378,6 +539,7 @@ struct ContentView: View {
         } else {
             phaseRemaining = 0
         }
+        if isPlaying { restartMetronome() }
     }
 
     private func advancePhase() {
@@ -388,8 +550,8 @@ struct ContentView: View {
                 currentPhaseIndex = next
             }
             applyCurrentPhase()
-        } else if isPlaying {
-            togglePlayback()   // workout complete — stop cleanly
+        } else {
+            finishSession()   // workout complete — reset to START
         }
     }
 
@@ -437,7 +599,14 @@ struct ContentView: View {
         trainingTitle = plan.title
         isGarminConnected = true
         currentPhaseIndex = 0
+        PlanStore.lastActiveID = plan.id
         applyCurrentPhase()
+        // Phase 1 may have no cadence assigned — seed the wheel from the first
+        // phase that does, so loading a plan is visible immediately.
+        if (currentPhase?.targetSPM ?? 0) == 0,
+           let lead = plan.phases.first(where: \.isAssigned)?.targetSPM {
+            spm = Double(lead)
+        }
         syncWidget()
     }
 
@@ -446,39 +615,54 @@ struct ContentView: View {
         clockTimer?.invalidate()
     }
 
-    // MARK: Metronome
+    // MARK: Session (START / PAUSE / RESUME / FINISH)
 
-    private func togglePlayback() {
-        isPlaying ? stopMetronome() : startMetronome()
-        isPlaying.toggle()
-    }
-
-    private func startMetronome() {
-        guard spm > 0 else { return }
+    private func startSession() {
+        isPaused = false
+        isPlaying = true
         stepCount = 0
-        let interval = 60.0 / spm
-        metronomeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-            tick()
-        }
+        applyCurrentPhase()  // seed label/cadence/countdown from the first phase
         startLiveActivity()
+        restartMetronome()   // schedules ticks unless the current phase is a pause
     }
 
-    private func stopMetronome() {
+    private func pauseSession() {
+        metronomeTimer?.invalidate()
+        metronomeTimer = nil
+        isPlaying = false
+        isPaused = true      // session stays up (Live Activity), just silent
+    }
+
+    private func resumeSession() {
+        isPaused = false
+        isPlaying = true
+        restartMetronome()
+    }
+
+    private func finishSession() {
         metronomeTimer?.invalidate()
         metronomeTimer = nil
         endLiveActivity()
+        isPlaying = false
+        isPaused = false
+        totalSteps = 0
+        currentPhaseIndex = 0
+        applyCurrentPhase()  // back to the first phase (won't tick — not playing)
     }
 
+    /// (Re)schedule the tick timer — but stay silent on a pause phase, so the
+    /// session keeps running (Live Activity stays up) while waiting for the user.
     private func restartMetronome() {
         metronomeTimer?.invalidate()
-        guard spm > 0 else { return }
+        metronomeTimer = nil
+        guard !isCurrentPhasePause, spm > 0 else { return }
         let interval = 60.0 / spm
         metronomeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in tick() }
     }
 
     private func commitSPMEdit() {
         if let parsed = Double(spmInputText) {
-            spm = min(max(parsed.rounded(), 0), 300)
+            spm = min(max(parsed.rounded(), Double(wheelRange.lowerBound)), Double(wheelRange.upperBound))
         }
         isEditingSPM = false
         spmFieldFocused = false

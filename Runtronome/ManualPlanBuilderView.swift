@@ -2,26 +2,31 @@ import SwiftUI
 
 /// Keyboard focus targets across the builder's dynamic text fields.
 private enum BuilderField: Hashable {
-    case title
-    case phaseTitle(UUID)
+    case planTitle
+    case elementTitle(UUID)
     case note(UUID)
     case minutes(UUID)
     case seconds(UUID)
     case distance(UUID)
+    case spm(UUID)
 }
 
-/// Manual plan builder — reached from the metronome's top-right icon. Lets the
-/// user assemble a `WorkoutPlan` by hand (no syncing): name + description, then
-/// add phases (title, time mm:ss or distance, target SPM) and "Save & Start".
+/// Manual plan builder. A workout is a free, reorderable mix of elements:
+/// single **steps** (warm up, a hold, cool down…) and **repeat blocks**
+/// (work + rest × rounds). On save the structure expands into the flat phases
+/// the metronome runs.
 struct ManualPlanBuilderView: View {
     var onCancel: () -> Void
     var onSave: (WorkoutPlan) -> Void
 
+    /// The plan being edited, if any — its identity/metadata survive the save
+    /// so edits update the stored plan instead of duplicating it.
+    private let source: WorkoutPlan?
+
     @State private var title: String
-    @State private var phases: [WorkoutPhase]
+    @State private var elements: [WorkoutElement]
     @FocusState private var focused: BuilderField?
 
-    /// Pass `existing` to edit an already-built plan; omit to start fresh.
     init(
         existing: WorkoutPlan? = nil,
         onCancel: @escaping () -> Void,
@@ -29,8 +34,22 @@ struct ManualPlanBuilderView: View {
     ) {
         self.onCancel = onCancel
         self.onSave = onSave
+        self.source = existing
         _title = State(initialValue: existing?.title ?? "My Plan")
-        _phases = State(initialValue: existing?.phases ?? [])
+        _elements = State(initialValue: existing?.elements ?? [Self.makeStep("Warm Up", .time(seconds: 300))])
+    }
+
+    private static func makeStep(_ name: String, _ goal: PhaseGoal) -> WorkoutElement {
+        .step(WorkoutPhase(title: name, goal: goal))
+    }
+
+    private static func makeBlock() -> WorkoutElement {
+        .block(RepeatBlock(
+            title: "Intervals",
+            work: WorkoutPhase(title: "Work", goal: .distance(meters: 400)),
+            rest: WorkoutPhase(title: "Rest", goal: .time(seconds: 120)),
+            rounds: 6
+        ))
     }
 
     var body: some View {
@@ -43,27 +62,21 @@ struct ManualPlanBuilderView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 8)
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 14) {
-                        planHeaderCard
-                        ForEach($phases) { $phase in
-                            BuilderPhaseRow(
-                                phase: $phase,
-                                focused: $focused,
-                                onDelete: { delete(phase) }
-                            )
-                        }
-                        addPhaseButton
-                        if phases.isEmpty { emptyHint }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
-                }
-                .scrollDismissesKeyboard(.interactively)
+                List {
+                    planNameCard.plainRow()
 
-                footer
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 32)
+                    // Touch-and-hold a card to drag and reorder.
+                    ForEach($elements) { $element in
+                        elementCard($element).plainRow()
+                    }
+                    .onMove { from, to in elements.move(fromOffsets: from, toOffset: to) }
+
+                    addButtons.plainRow()
+                    saveButton.plainRow(EdgeInsets(top: 10, leading: 20, bottom: 24, trailing: 20))
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .scrollDismissesKeyboard(.interactively)
             }
         }
         .toolbar {
@@ -79,28 +92,31 @@ struct ManualPlanBuilderView: View {
     // MARK: Top bar
 
     private var topBar: some View {
-        ZStack {
-            Text("NEW PLAN")
-                .font(.momoTrust(size: 11, weight: .regular))
-                .foregroundColor(Theme.textTertiary)
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            MastheadRule()
+
+            HStack(alignment: .center) {
+                Text(source == nil ? "NEW PLAN" : "EDIT PLAN")
+                    .font(.anton(size: 30))
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
                 Button(action: onCancel) {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(Theme.textPrimary)
                         .frame(width: 40, height: 40)
-                        .background(Circle().fill(Theme.control))
-                        .contentShape(Circle())
+                        .background(Rectangle().fill(Theme.control))
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableButtonStyle())
-                Spacer()
             }
+            .padding(.vertical, 12)
+
+            Hairline()
         }
     }
 
-    // MARK: Plan header (name + description)
-
-    private var planHeaderCard: some View {
+    private var planNameCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("PLAN NAME")
                 .font(.momoTrust(size: 10, weight: .regular))
@@ -109,272 +125,400 @@ struct ManualPlanBuilderView: View {
                 .font(.momoTrust(size: 22, weight: .semibold))
                 .foregroundColor(Theme.textPrimary)
                 .tint(Theme.textPrimary)
-                .focused($focused, equals: .title)
+                .focused($focused, equals: .planTitle)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.surface))
+        .background(card)
     }
 
-    // MARK: Add / empty / footer
+    // MARK: Element cards
 
-    private var addPhaseButton: some View {
-        Button(action: addPhase) {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .semibold))
-                Text("ADD PHASE")
-                    .font(.momoTrust(size: 13, weight: .semibold))
+    @ViewBuilder
+    private func elementCard(_ element: Binding<WorkoutElement>) -> some View {
+        if let phase = element.stepPhase {
+            stepCard(phase: phase)
+        } else if let block = element.repeatBlock {
+            blockCard(block: block)
+        }
+    }
+
+    private func stepCard(phase: Binding<WorkoutPhase>) -> some View {
+        VStack(spacing: 12) {
+            cardHeader(title: phase.title, id: phase.wrappedValue.id, placeholder: "Step name", badge: nil)
+            StepEditor(phase: phase, focused: $focused, allowPause: true, showNote: true)
+        }
+        .padding(18)
+        .background(card)
+    }
+
+    private func blockCard(block: Binding<RepeatBlock>) -> some View {
+        VStack(spacing: 14) {
+            cardHeader(title: block.title, id: block.wrappedValue.id, placeholder: "Block name", badge: "REPEAT")
+
+            stepSection("WORK") {
+                StepEditor(phase: block.work, focused: $focused, allowPause: false, showNote: false)
+            }
+            Hairline()
+            stepSection("REST") {
+                StepEditor(phase: block.rest, focused: $focused, allowPause: true, showNote: false)
+            }
+            Hairline()
+            roundsRow(block.rounds)
+        }
+        .padding(18)
+        .background(card)
+        .overlay(
+            Rectangle()
+                .strokeBorder(Theme.textPrimary.opacity(0.14), lineWidth: 1)
+        )
+    }
+
+    private func cardHeader(title: Binding<String>, id: UUID, placeholder: String, badge: String?) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")   // decorative reorder cue
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(Theme.textTertiary)
+                .frame(width: 22)
+
+            TextField("", text: title, prompt: Text(placeholder))
+                .font(.momoTrust(size: 16, weight: .semibold))
+                .foregroundColor(Theme.textPrimary)
+                .tint(Theme.textPrimary)
+                .focused($focused, equals: .elementTitle(id))
+
+            if let badge {
+                Text(badge)
+                    .font(.momoTrust(size: 9, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundColor(Theme.textTertiary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Rectangle().fill(Theme.surfaceRaised))
+            }
+
+            Button { delete(id) } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Theme.textTertiary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func stepSection<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(label)
+                .font(.momoTrust(size: 11, weight: .semibold))
+                .foregroundColor(Theme.textPrimary)
+            content()
+        }
+    }
+
+    private func roundsRow(_ rounds: Binding<Int>) -> some View {
+        HStack(spacing: 12) {
+            Text("ROUNDS")
+                .font(.momoTrust(size: 10, weight: .semibold))
+                .tracking(1.2)
+                .foregroundColor(Theme.textTertiary)
+                .frame(width: 84, alignment: .leading)
+            Spacer(minLength: 8)
+            HStack(spacing: 14) {
+                roundButton("minus") { if rounds.wrappedValue > 1 { rounds.wrappedValue -= 1 } }
+                Text("\(rounds.wrappedValue)")
+                    .font(.anton(size: 22))
+                    .foregroundColor(.white)
+                    .monospacedDigit()
+                    .frame(minWidth: 30)
+                    .contentTransition(.numericText())
+                roundButton("plus") { if rounds.wrappedValue < 50 { rounds.wrappedValue += 1 } }
+            }
+        }
+    }
+
+    private func roundButton(_ icon: String, _ action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.snappy) { action() }
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 40, height: 40)
+                .background(Rectangle().fill(Theme.control))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Add / save
+
+    private var addButtons: some View {
+        HStack(spacing: 10) {
+            dashedButton("ADD STEP", "plus") {
+                withAnimation(.snappy) { elements.append(Self.makeStep("Step", .time(seconds: 300))) }
+            }
+            dashedButton("ADD INTERVAL", "repeat") {
+                withAnimation(.snappy) { elements.append(Self.makeBlock()) }
+            }
+        }
+    }
+
+    private func dashedButton(_ label: String, _ icon: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: icon).font(.system(size: 13, weight: .semibold))
+                Text(label).font(.momoTrust(size: 12, weight: .bold)).tracking(1.2)
             }
             .foregroundColor(Theme.textSecondary)
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            .frame(height: 50)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                Rectangle()
                     .strokeBorder(Theme.stroke, style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
             )
         }
         .buttonStyle(PressableButtonStyle())
     }
 
-    private var emptyHint: some View {
-        Text("Add phases to build your run.")
-            .font(.momoTrust(size: 13, weight: .regular))
-            .foregroundColor(Theme.textTertiary)
-            .padding(.top, 4)
-    }
-
-    private var footer: some View {
+    private var saveButton: some View {
         Button(action: save) {
-            RuntronomeButton(style: .primary(text: "SAVE & START", systemImage: "play.fill"))
+            HStack(spacing: 8) {
+                Image(systemName: "play.fill").font(.system(size: 14, weight: .semibold))
+                Text("SAVE & START")
+            }
         }
-        .buttonStyle(PressableButtonStyle())
-        .opacity(phases.isEmpty ? 0.4 : 1)
-        .disabled(phases.isEmpty)
+        .buttonStyle(.app(.primary))
+        .opacity(elements.isEmpty ? 0.4 : 1)
+        .disabled(elements.isEmpty)
     }
 
-    // MARK: Actions
-
-    private func addPhase() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            phases.append(WorkoutPhase(title: "", goal: .time(seconds: 300)))
-        }
-    }
-
-    private func delete(_ phase: WorkoutPhase) {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            phases.removeAll { $0.id == phase.id }
-        }
+    private func delete(_ id: UUID) {
+        withAnimation(.snappy) { elements.removeAll { $0.id == id } }
     }
 
     private func save() {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let plan = WorkoutPlan(
+            id: source?.id ?? UUID(),
             title: cleanTitle.isEmpty ? "My Plan" : cleanTitle,
-            date: Date(),
-            location: "",
-            temperature: "",
-            phases: phases
+            date: source?.date ?? Date(),
+            location: source?.location ?? "",
+            temperature: source?.temperature ?? "",
+            elements: elements,
+            phases: elements.expandedPhases
         )
         onSave(plan)
     }
+
+    private var card: some View {
+        Rectangle().fill(Theme.surface)
+    }
 }
 
-// MARK: - Builder Row
+// MARK: - Binding into a WorkoutElement's case
 
-/// One editable phase: title + delete, time (mm:ss) / distance entry, SPM.
-private struct BuilderPhaseRow: View {
+private extension Binding where Value == WorkoutElement {
+    var stepPhase: Binding<WorkoutPhase>? {
+        guard case .step(let phase) = wrappedValue else { return nil }
+        return Binding<WorkoutPhase>(
+            get: { if case .step(let p) = wrappedValue { return p } else { return phase } },
+            set: { wrappedValue = .step($0) }
+        )
+    }
+
+    var repeatBlock: Binding<RepeatBlock>? {
+        guard case .block(let block) = wrappedValue else { return nil }
+        return Binding<RepeatBlock>(
+            get: { if case .block(let b) = wrappedValue { return b } else { return block } },
+            set: { wrappedValue = .block($0) }
+        )
+    }
+}
+
+// MARK: - List row styling
+
+private extension View {
+    /// Strips List chrome; uses the screen background so a lifted row during
+    /// reorder shows the dark backdrop instead of a black default-cell flash.
+    func plainRow(_ insets: EdgeInsets = EdgeInsets(top: 7, leading: 20, bottom: 7, trailing: 20)) -> some View {
+        listRowInsets(insets)
+            .listRowBackground(Theme.background)
+            .listRowSeparator(.hidden)
+    }
+}
+
+// MARK: - Step editor (one phase: description, goal, target SPM)
+
+private struct StepEditor: View {
     @Binding var phase: WorkoutPhase
     @FocusState.Binding var focused: BuilderField?
-    var onDelete: () -> Void
+    var allowPause: Bool
+    var showNote: Bool
 
-    private var isDistance: Bool {
-        if case .distance = phase.goal { return true }
-        return false
-    }
+    private var isTime: Bool { if case .time = phase.goal { return true }; return false }
+    private var isDistance: Bool { if case .distance = phase.goal { return true }; return false }
+    private var isPause: Bool { if case .pause = phase.goal { return true }; return false }
+    private var currentSeconds: Int { if case .time(let s) = phase.goal { return s }; return 0 }
+    private var currentMeters: Int { if case .distance(let m) = phase.goal { return m }; return 0 }
 
-    private var currentSeconds: Int {
-        if case .time(let seconds) = phase.goal { return seconds }
-        return 0
-    }
-
-    private var currentMeters: Int {
-        if case .distance(let meters) = phase.goal { return meters }
-        return 0
-    }
-
+    /// A flat table: fixed label lane on the left, controls on the right,
+    /// hairlines between rows — every value has an anchor.
     var body: some View {
-        VStack(spacing: 14) {
-            // Title (free text) + delete
-            HStack {
-                TextField("", text: $phase.title, prompt: Text("Phase title"))
-                    .font(.momoTrust(size: 16, weight: .semibold))
-                    .foregroundColor(Theme.textPrimary)
-                    .tint(Theme.textPrimary)
-                    .focused($focused, equals: .phaseTitle(phase.id))
+        VStack(spacing: 0) {
+            row("GOAL") { goalToggle }
 
-                Spacer(minLength: 8)
-
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Theme.textTertiary)
-                        .frame(width: 36, height: 36)
-                        .contentShape(Rectangle())
+            if isPause {
+                Hairline()
+                Text("Pauses until you tap to continue.")
+                    .font(.momoTrust(size: 12, weight: .regular))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 12)
+            } else {
+                Hairline()
+                row(isTime ? "DURATION" : "DISTANCE") {
+                    if isTime { timeEntry } else { distanceEntry }
                 }
-                .buttonStyle(.plain)
+                Hairline()
+                row("TARGET SPM") {
+                    NumberField(
+                        value: $phase.targetSPM,
+                        range: 0...300,
+                        caption: "SPM",
+                        focused: $focused,
+                        field: .spm(phase.id)
+                    )
+                }
             }
 
-            // Per-phase description
-            TextField("", text: noteText, prompt: Text("Add a description"), axis: .vertical)
+            if showNote {
+                Hairline()
+                noteRow
+            }
+        }
+    }
+
+    /// Label lane (fixed width) + right-aligned control.
+    private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .font(.momoTrust(size: 10, weight: .semibold))
+                .tracking(1.2)
+                .foregroundColor(Theme.textTertiary)
+                .frame(width: 84, alignment: .leading)
+            Spacer(minLength: 8)
+            content()
+        }
+        .padding(.vertical, 10)
+    }
+
+    private var noteRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text("NOTE")
+                .font(.momoTrust(size: 10, weight: .semibold))
+                .tracking(1.2)
+                .foregroundColor(Theme.textTertiary)
+                .frame(width: 84, alignment: .leading)
+            TextField("", text: noteText,
+                      prompt: Text("Add a description").foregroundStyle(Theme.textTertiary),
+                      axis: .vertical)
                 .font(.momoTrust(size: 13, weight: .regular))
                 .foregroundColor(Theme.textSecondary)
                 .tint(Theme.textPrimary)
                 .lineLimit(1...3)
                 .focused($focused, equals: .note(phase.id))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Goal: time/distance toggle + typed value
-            HStack(spacing: 12) {
-                goalTypeToggle
-                Spacer()
-                if isDistance { distanceEntry } else { timeEntry }
-            }
-
-            Rectangle().fill(Theme.stroke).frame(height: 1)
-
-            // Target SPM
-            HStack {
-                Text("TARGET SPM")
-                    .font(.momoTrust(size: 11, weight: .regular))
-                    .foregroundColor(Theme.textTertiary)
-                Spacer()
-                SPMStepper(value: $phase.targetSPM)
-            }
         }
-        .padding(18)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.surface))
+        .padding(.vertical, 12)
     }
 
-    // MARK: Goal type toggle
-
-    private var goalTypeToggle: some View {
-        HStack(spacing: 4) {
-            // Tapping the already-active unit is a no-op so a typed value isn't wiped.
-            toggleChip(title: "TIME", active: !isDistance) {
-                if isDistance { phase.goal = .time(seconds: 300) }
-            }
-            toggleChip(title: "DIST", active: isDistance) {
-                if !isDistance { phase.goal = .distance(meters: 400) }
+    private var goalToggle: some View {
+        HStack(spacing: 3) {
+            chip("TIME", active: isTime) { if !isTime { phase.goal = .time(seconds: 300) } }
+            chip("DIST", active: isDistance) { if !isDistance { phase.goal = .distance(meters: 400) } }
+            if allowPause {
+                chip("PAUSE", active: isPause) {
+                    if !isPause { phase.goal = .pause; phase.targetSPM = nil }
+                }
             }
         }
         .padding(3)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.background))
+        .background(Rectangle().fill(Theme.background))
     }
 
-    private func toggleChip(title: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func chip(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.momoTrust(size: 11, weight: .semibold))
+                .font(.momoTrust(size: 11, weight: .bold))
+                .tracking(1.0)
                 .foregroundColor(active ? Theme.ctaLabel : Theme.textSecondary)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(active ? Theme.ctaFill : Color.clear)
-                )
+                .background(Rectangle().fill(active ? Theme.ctaFill : Color.clear))
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: Value entry
+    // MARK: Value entry (slide or type)
 
-    /// Minutes : seconds, each typed separately.
     private var timeEntry: some View {
-        HStack(alignment: .top, spacing: 6) {
-            timeField(minutesText, placeholder: "0", caption: "MIN", field: .minutes(phase.id))
+        HStack(alignment: .top, spacing: 8) {
+            NumberField(
+                value: minutesValue, range: 0...180,
+                caption: "MIN", width: 48,
+                focused: $focused, field: .minutes(phase.id)
+            )
             Text(":")
-                .font(.momoTrust(size: 20, weight: .semibold))
+                .font(.anton(size: 20))
                 .foregroundColor(Theme.textTertiary)
-                .padding(.top, 2)
-            timeField(secondsText, placeholder: "00", caption: "SEC", field: .seconds(phase.id))
-        }
-    }
-
-    private func timeField(_ text: Binding<String>, placeholder: String, caption: String, field: BuilderField) -> some View {
-        VStack(spacing: 2) {
-            TextField(placeholder, text: text)
-                .font(.momoTrust(size: 20, weight: .semibold))
-                .foregroundColor(Theme.textPrimary)
-                .tint(Theme.textPrimary)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.center)
-                .frame(width: 46)
-                .focused($focused, equals: field)
-            Text(caption)
-                .font(.momoTrust(size: 8, weight: .regular))
-                .foregroundColor(Theme.textTertiary)
+                .padding(.top, 3)
+            NumberField(
+                value: secondsValue, range: 0...59,
+                caption: "SEC", width: 48,
+                focused: $focused, field: .seconds(phase.id)
+            )
         }
     }
 
     private var distanceEntry: some View {
-        HStack(spacing: 6) {
-            TextField("0", text: distanceText)
-                .font(.momoTrust(size: 20, weight: .semibold))
-                .foregroundColor(Theme.textPrimary)
-                .tint(Theme.textPrimary)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 64)
-                .focused($focused, equals: .distance(phase.id))
+        HStack(spacing: 8) {
+            NumberField(
+                value: distanceValue, range: 0...50000,
+                caption: nil, width: 76,
+                focused: $focused, field: .distance(phase.id)
+            )
             Text("M")
                 .font(.momoTrust(size: 11, weight: .regular))
+                .tracking(1.2)
                 .foregroundColor(Theme.textTertiary)
-                .frame(width: 24, alignment: .leading)
         }
     }
 
-    // MARK: Bindings
-
-    private var minutesText: Binding<String> {
-        Binding(
-            get: {
-                let minutes = currentSeconds / 60
-                return minutes == 0 ? "" : String(minutes)
-            },
-            set: { newValue in
-                let minutes = Int(newValue.filter(\.isNumber)) ?? 0
-                phase.goal = .time(seconds: minutes * 60 + currentSeconds % 60)
-            }
-        )
-    }
-
-    private var secondsText: Binding<String> {
-        Binding(
-            get: {
-                let seconds = currentSeconds % 60
-                return seconds == 0 ? "" : String(seconds)
-            },
-            set: { newValue in
-                let seconds = min(Int(newValue.filter(\.isNumber)) ?? 0, 59)
-                phase.goal = .time(seconds: (currentSeconds / 60) * 60 + seconds)
-            }
-        )
-    }
-
-    private var distanceText: Binding<String> {
-        Binding(
-            get: { currentMeters == 0 ? "" : String(currentMeters) },
-            set: { newValue in
-                phase.goal = .distance(meters: Int(newValue.filter(\.isNumber)) ?? 0)
-            }
-        )
-    }
+    // MARK: Bindings into the goal
 
     private var noteText: Binding<String> {
+        Binding(get: { phase.note ?? "" }, set: { phase.note = $0.isEmpty ? nil : $0 })
+    }
+
+    private var minutesValue: Binding<Int?> {
         Binding(
-            get: { phase.note ?? "" },
-            set: { phase.note = $0.isEmpty ? nil : $0 }
+            get: { let m = currentSeconds / 60; return m == 0 ? nil : m },
+            set: { phase.goal = .time(seconds: ($0 ?? 0) * 60 + currentSeconds % 60) }
+        )
+    }
+
+    private var secondsValue: Binding<Int?> {
+        Binding(
+            get: { let s = currentSeconds % 60; return s == 0 ? nil : s },
+            set: { phase.goal = .time(seconds: (currentSeconds / 60) * 60 + min($0 ?? 0, 59)) }
+        )
+    }
+
+    private var distanceValue: Binding<Int?> {
+        Binding(
+            get: { currentMeters == 0 ? nil : currentMeters },
+            set: { phase.goal = .distance(meters: $0 ?? 0) }
         )
     }
 }
