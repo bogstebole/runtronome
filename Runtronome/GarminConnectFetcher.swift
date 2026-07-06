@@ -8,37 +8,88 @@ import Foundation
 // and maps Garmin's step tree onto `WorkoutElement`s so the plan is fully
 // editable in the builder and runnable by the metronome.
 
+/// One scheduled workout on the Garmin calendar — enough to list it before
+/// pulling its full structure on tap.
+struct GarminScheduledWorkout: Identifiable, Equatable {
+    let id: Int64        // workoutId
+    let date: Date
+    let title: String
+}
+
 struct GarminConnectFetcher: WorkoutFetcherService {
     private static let api = "https://connectapi.garmin.com"
 
-    func fetchTodaysWorkout() async throws -> WorkoutPlan {
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    /// Every scheduled workout from today through `daysAhead`, sorted soonest
+    /// first. Pulls each calendar month the window spans (Garmin months are
+    /// 0-based) and keeps only workout items with a structure to fetch.
+    func fetchUpcoming(daysAhead: Int = 45) async throws -> [GarminScheduledWorkout] {
         guard GarminSession.isLoggedIn else {
             throw WorkoutFetchError.sourceUnavailable("Sign in to Garmin first.")
         }
         let token = try await GarminSession.validAccessToken()
 
-        let today = Date()
         let calendar = Calendar.current
-        let year = calendar.component(.year, from: today)
-        let month = calendar.component(.month, from: today) - 1   // Garmin months are 0-based
+        let today = calendar.startOfDay(for: Date())
+        let horizon = calendar.date(byAdding: .day, value: daysAhead, to: today) ?? today
 
-        let items: GarminCalendar = try await get(
-            "\(Self.api)/calendar-service/year/\(year)/month/\(month)", token: token)
+        var results: [GarminScheduledWorkout] = []
+        for (year, month) in months(from: today, to: horizon, calendar: calendar) {
+            let page: GarminCalendar = try await get(
+                "\(Self.api)/calendar-service/year/\(year)/month/\(month)", token: token)
+            for item in page.calendarItems ?? [] {
+                guard item.itemType == "workout",
+                      let id = item.workoutId,
+                      let dateString = item.date,
+                      let date = Self.dayFormatter.date(from: dateString),
+                      date >= today, date <= horizon
+                else { continue }
+                results.append(GarminScheduledWorkout(
+                    id: id, date: date, title: item.title ?? "Workout"))
+            }
+        }
+        return results.sorted { $0.date < $1.date }
+    }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let todayString = formatter.string(from: today)
+    /// Full structured plan for one scheduled workout.
+    func fetchWorkout(_ scheduled: GarminScheduledWorkout) async throws -> WorkoutPlan {
+        let token = try await GarminSession.validAccessToken()
+        let workout: GarminWorkout = try await get(
+            "\(Self.api)/workout-service/workout/\(scheduled.id)", token: token)
+        return Self.makePlan(from: workout, date: scheduled.date)
+    }
 
-        guard let scheduled = items.calendarItems?.first(where: {
-            $0.itemType == "workout" && $0.date == todayString && $0.workoutId != nil
+    func fetchTodaysWorkout() async throws -> WorkoutPlan {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        guard let todays = try await fetchUpcoming(daysAhead: 0).first(where: {
+            calendar.isDate($0.date, inSameDayAs: today)
         }) else {
             throw WorkoutFetchError.noWorkoutFound
         }
+        return try await fetchWorkout(todays)
+    }
 
-        let workout: GarminWorkout = try await get(
-            "\(Self.api)/workout-service/workout/\(scheduled.workoutId!)", token: token)
-
-        return Self.makePlan(from: workout, date: today)
+    /// The (year, month0) calendar pages a date window touches. `month0` is
+    /// 0-based to match Garmin's API.
+    private func months(from start: Date, to end: Date, calendar: Calendar) -> [(Int, Int)] {
+        var pairs: [(Int, Int)] = []
+        var cursor = calendar.date(from: calendar.dateComponents([.year, .month], from: start)) ?? start
+        let endMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: end)) ?? end
+        while cursor <= endMonth {
+            let comps = calendar.dateComponents([.year, .month], from: cursor)
+            if let year = comps.year, let month = comps.month {
+                pairs.append((year, month - 1))
+            }
+            cursor = calendar.date(byAdding: .month, value: 1, to: cursor) ?? endMonth.addingTimeInterval(1)
+        }
+        return pairs
     }
 
     private func get<T: Decodable>(_ urlString: String, token: String) async throws -> T {

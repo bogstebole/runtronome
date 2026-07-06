@@ -1,17 +1,19 @@
 import SwiftUI
 
 /// Garmin Connect sync screen, hosted by the plans flow. Signs in with the
-/// user's own Garmin credentials (tokens go to the Keychain), then pulls
-/// today's scheduled structured workout and hands it up for SPM assignment.
+/// user's own Garmin credentials (tokens go to the Keychain), lists every
+/// scheduled workout in the coming weeks, and hands the chosen one up for
+/// per-phase SPM assignment.
 struct GarminSyncView: View {
     var onBack: () -> Void
-    /// Called with today's fetched plan.
+    /// Called with the chosen workout's fetched plan.
     var onFetched: (WorkoutPlan) -> Void
 
     private enum Phase {
         case credentials
         case mfa(GarminMFAContext)
         case working(String)
+        case picker([GarminScheduledWorkout])
         case failed(String)
     }
 
@@ -23,6 +25,12 @@ struct GarminSyncView: View {
 
     private enum Field { case email, password, mfa }
 
+    private static let rowDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE d MMM"
+        return f
+    }()
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -31,17 +39,18 @@ struct GarminSyncView: View {
 
             content
                 .padding(.horizontal, 24)
-                .padding(.top, 32)
+                .padding(.top, isPicker ? 8 : 32)
+                .frame(maxHeight: isPicker ? .infinity : nil, alignment: .top)
 
-            Spacer()
+            if !isPicker { Spacer() }
 
             footer
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
         }
         .onAppear {
-            // Already signed in from a previous session → skip straight to the fetch.
-            if GarminSession.isLoggedIn { fetch() }
+            // Already signed in from a previous session → skip straight to the list.
+            if GarminSession.isLoggedIn { fetchUpcoming() }
         }
     }
 
@@ -87,12 +96,28 @@ struct GarminSyncView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack {
-                MetaLabel(text: "PULL TODAY'S PLANNED WORKOUT")
+                MetaLabel(text: subtitle)
                 Spacer()
+                if case .picker(let workouts) = phase {
+                    MetaLabel(text: "\(workouts.count) SCHEDULED", color: Theme.textTertiary)
+                }
             }
             .padding(.bottom, 14)
 
             Hairline()
+        }
+    }
+
+    private var isPicker: Bool {
+        if case .picker = phase { return true }
+        return false
+    }
+
+    private var subtitle: String {
+        switch phase {
+        case .picker: return "PICK A WORKOUT TO IMPORT"
+        case .mfa:    return "VERIFY IT'S YOU"
+        default:      return "PULL YOUR PLANNED WORKOUTS"
         }
     }
 
@@ -132,6 +157,9 @@ struct GarminSyncView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 60)
+
+        case .picker(let workouts):
+            workoutList(workouts)
 
         case .failed(let message):
             VStack(spacing: 14) {
@@ -205,15 +233,81 @@ struct GarminSyncView: View {
                 .opacity(mfaCode.isEmpty ? 0.4 : 1)
                 .disabled(mfaCode.isEmpty)
 
-        case .working:
+        case .working, .picker:
             EmptyView()
 
         case .failed:
             Button("TRY AGAIN") {
-                if GarminSession.isLoggedIn { fetch() } else { phase = .credentials }
+                if GarminSession.isLoggedIn { fetchUpcoming() } else { phase = .credentials }
             }
             .buttonStyle(.app(.primary))
         }
+    }
+
+    // MARK: Workout picker list
+
+    private func workoutList(_ workouts: [GarminScheduledWorkout]) -> some View {
+        Group {
+            if workouts.isEmpty {
+                VStack(spacing: 10) {
+                    Text("NOTHING SCHEDULED")
+                        .font(.momoTrust(size: 14, weight: .medium))
+                        .tracking(1.2)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("No planned workouts on your Garmin calendar in the coming weeks.")
+                        .font(.momoTrust(size: 12, weight: .regular))
+                        .foregroundColor(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 60)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(workouts) { workout in
+                            workoutRow(workout)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func workoutRow(_ workout: GarminScheduledWorkout) -> some View {
+        Button {
+            importWorkout(workout)
+        } label: {
+            VStack(spacing: 0) {
+                HStack(spacing: 14) {
+                    Text(Self.rowDateFormatter.string(from: workout.date).uppercased())
+                        .font(.momoTrust(size: 11, weight: .bold))
+                        .tracking(1.0)
+                        .foregroundColor(isToday(workout.date) ? Theme.textPrimary : Theme.textTertiary)
+                        .frame(width: 92, alignment: .leading)
+
+                    Text(workout.title)
+                        .font(.momoTrust(size: 15, weight: .medium))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .padding(.vertical, 16)
+
+                Hairline()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableButtonStyle())
+    }
+
+    private func isToday(_ date: Date) -> Bool {
+        Calendar.current.isDateInToday(date)
     }
 
     // MARK: Actions
@@ -225,7 +319,7 @@ struct GarminSyncView: View {
             do {
                 switch try await GarminLogin.login(email: email, password: password) {
                 case .success:
-                    fetch()
+                    fetchUpcoming()
                 case .mfaRequired(let context):
                     phase = .mfa(context)
                 }
@@ -242,18 +336,32 @@ struct GarminSyncView: View {
         Task {
             do {
                 try await GarminLogin.submitMFA(code: mfaCode, context: context)
-                fetch()
+                fetchUpcoming()
             } catch {
                 phase = .failed(readable(error))
             }
         }
     }
 
-    private func fetch() {
-        phase = .working("FETCHING TODAY'S WORKOUT…")
+    /// Load the list of scheduled workouts to choose from.
+    private func fetchUpcoming() {
+        phase = .working("READING YOUR CALENDAR…")
         Task {
             do {
-                let plan = try await GarminConnectFetcher().fetchTodaysWorkout()
+                let workouts = try await GarminConnectFetcher().fetchUpcoming()
+                phase = .picker(workouts)
+            } catch {
+                phase = .failed(readable(error))
+            }
+        }
+    }
+
+    /// Pull one chosen workout's full structure and hand it up for SPM assignment.
+    private func importWorkout(_ workout: GarminScheduledWorkout) {
+        phase = .working("FETCHING WORKOUT…")
+        Task {
+            do {
+                let plan = try await GarminConnectFetcher().fetchWorkout(workout)
                 onFetched(plan)
             } catch {
                 phase = .failed(readable(error))
