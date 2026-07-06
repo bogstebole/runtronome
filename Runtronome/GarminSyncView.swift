@@ -153,34 +153,39 @@ struct GarminSyncView: View {
     // MARK: Fields (Swiss underline style)
 
     private func field(_ label: String, text: Binding<String>, focus: Field) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            MetaLabel(text: label, color: Theme.textTertiary)
+        fieldRow(label, focus: focus) {
             TextField("", text: text)
-                .font(.momoTrust(size: 17, weight: .medium))
-                .foregroundColor(Theme.textPrimary)
-                .tint(Theme.textPrimary)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .focused($focusedField, equals: focus)
-            Rectangle()
-                .fill(focusedField == focus ? Theme.textPrimary : Theme.stroke)
-                .frame(height: 1)
         }
     }
 
     private func secureField(_ label: String, text: Binding<String>, focus: Field) -> some View {
+        fieldRow(label, focus: focus) {
+            SecureField("", text: text)
+                .textContentType(.password)
+                .focused($focusedField, equals: focus)
+        }
+    }
+
+    /// Shared field chrome: label, the input (given a comfortable tap height),
+    /// and an underline. The whole row is the tap target — a bare TextField is
+    /// only one text-line tall and easy to miss.
+    private func fieldRow(_ label: String, focus: Field, @ViewBuilder input: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             MetaLabel(text: label, color: Theme.textTertiary)
-            SecureField("", text: text)
+            input()
                 .font(.momoTrust(size: 17, weight: .medium))
                 .foregroundColor(Theme.textPrimary)
                 .tint(Theme.textPrimary)
-                .textContentType(.password)
-                .focused($focusedField, equals: focus)
+                .frame(height: 28)
             Rectangle()
                 .fill(focusedField == focus ? Theme.textPrimary : Theme.stroke)
                 .frame(height: 1)
         }
+        .contentShape(Rectangle())
+        .onTapGesture { focusedField = focus }
     }
 
     // MARK: Footer (call to action)
