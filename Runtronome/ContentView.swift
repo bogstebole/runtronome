@@ -105,6 +105,9 @@ struct ContentView: View {
             frequencyOverlay
             spmEditOverlay
         }
+        // Keep the layout still while the keyboard rises — the tapped number
+        // must not move; only the blur and the keyboard animate.
+        .ignoresSafeArea(.keyboard)
         .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: hapticTrigger)
         .onAppear { setup() }
         .onDisappear { teardown() }
@@ -262,6 +265,9 @@ struct ContentView: View {
     private let wheelRowHeight: CGFloat = 88
     private let wheelHeight: CGFloat = 396
     @State private var wheelSelection: Int?
+    /// Global frame of the wheel — the typing field is positioned over its
+    /// centre so the tapped number appears to stay in place.
+    @State private var wheelFrame: CGRect = .zero
 
     // The wheel stays in the hierarchy while editing (the editor is an overlay)
     // — recreating the ScrollView desyncs its scroll position and corrupts the
@@ -286,6 +292,7 @@ struct ContentView: View {
         .scrollTargetBehavior(.viewAligned)
         .safeAreaPadding(.vertical, (wheelHeight - wheelRowHeight) / 2)
         .frame(height: wheelHeight)
+        .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { wheelFrame = $0 }
         .sensoryFeedback(.selection, trigger: wheelSelection)
         .onAppear { wheelSelection = Int(spm) }
         .onChange(of: wheelSelection) { _, selected in
@@ -341,36 +348,43 @@ struct ContentView: View {
                     .offset(y: sign * (visualDist - dist))
                     .opacity(opacity)
             }
+            // Shared-element swap: while typing, this row is the hidden source
+            // and the overlay field renders in its exact place. The hide must
+            // be instant — any fade would double-expose the two glyphs.
+            .opacity(isEditingSPM && value == Int(spm) ? 0 : 1)
+            .animation(nil, value: isEditingSPM)
             .contentShape(Rectangle())
             .onTapGesture {
                 if value == Int(spm) {
-                    spmInputText = ""   // placeholder shows the current value
+                    spmInputText = ""   // prompt shows the current value
                     withAnimation(.easeInOut(duration: 0.2)) { isEditingSPM = true }
-                    spmFieldFocused = true
+                    // Focus is requested by the field's onAppear — asking here,
+                    // before the field exists, gets reverted by the system and
+                    // the revert instantly closes the editor.
                 } else {
                     withAnimation(.snappy) { wheelSelection = value }
                 }
             }
     }
 
-    /// Focused typing mode: the whole screen blurs and only the number being
-    /// entered stays sharp. Empty input (or a tap outside) leaves the cadence
-    /// unchanged.
+    /// Focused typing mode: the tapped number stays exactly where it is (the
+    /// wheel row hides, this field renders over its frame) while everything
+    /// else blurs behind it. Empty input or a tap outside cancels.
     private var spmEditOverlay: some View {
         ZStack {
             Color.black
-                .opacity(isEditingSPM ? 0.62 : 0)
+                .opacity(isEditingSPM ? 0.45 : 0)
                 .ignoresSafeArea()
                 .onTapGesture { commitSPMEdit() }
 
             if isEditingSPM {
-                VStack(spacing: 4) {
-                    MetaLabel(text: "TYPE CADENCE", color: Theme.textSecondary)
+                GeometryReader { geo in
+                    let local = geo.frame(in: .global)
                     TextField("", text: $spmInputText,
                               prompt: Text("\(Int(spm))").foregroundStyle(Theme.textSecondary))
                         .font(.anton(size: 140))
                         .foregroundColor(Theme.textPrimary)
-                        .tint(Theme.textPrimary)
+                        .tint(.clear)
                         .multilineTextAlignment(.center)
                         .keyboardType(.numberPad)
                         .focused($spmFieldFocused)
@@ -383,9 +397,15 @@ struct ContentView: View {
                                     .foregroundColor(.white)
                             }
                         }
-                    MetaLabel(text: "SPM", color: Theme.textTertiary)
+                        .position(x: wheelFrame.midX - local.minX,
+                                  y: wheelFrame.midY - local.minY)
+                        .onAppear {
+                            DispatchQueue.main.async { spmFieldFocused = true }
+                        }
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                // The glyph must appear/disappear in place, instantly — the
+                // "animation" is the world blurring around it.
+                .transition(.identity)
             }
         }
         .allowsHitTesting(isEditingSPM)
