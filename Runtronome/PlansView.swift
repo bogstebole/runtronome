@@ -163,24 +163,21 @@ struct PlansFlowView: View {
                         .tracking(1.0)
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
-                    MetaLabel(text: rowSummary(plan, isActive: isActive),
-                              color: isActive ? Theme.textSecondary : Theme.textTertiary)
-                        .lineLimit(1)
+
+                    // Status lives in the meta line so the title keeps full
+                    // width. "Needs pace" reads a touch brighter than the rest
+                    // of the summary — present but not shouting.
+                    HStack(spacing: 0) {
+                        MetaLabel(text: rowSummary(plan, isActive: isActive),
+                                  color: isActive ? Theme.textSecondary : Theme.textTertiary)
+                        if plan.needsPace {
+                            MetaLabel(text: " · NEEDS PACE", color: Theme.textSecondary)
+                        }
+                    }
+                    .lineLimit(1)
                 }
 
                 Spacer(minLength: 12)
-
-                // "NEEDS PACE" flags a plan (typically a fresh Garmin import)
-                // that still has phases without a cadence assigned.
-                if plan.needsPace {
-                    Text("NEEDS PACE")
-                        .font(.momoTrust(size: 9, weight: .bold))
-                        .tracking(1.2)
-                        .foregroundColor(Theme.ctaLabel)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Rectangle().fill(Theme.ctaFill))
-                }
 
                 rowButton("square.and.pencil") {
                     withAnimation(.easeInOut(duration: 0.2)) { mode = .build(plan) }
@@ -206,13 +203,19 @@ struct PlansFlowView: View {
     private func rowSummary(_ plan: WorkoutPlan, isActive: Bool) -> String {
         var parts: [String] = []
         // Garmin plans lead with their scheduled date so the calendar is legible.
-        if plan.isFromGarmin {
+        let hasDate = plan.isFromGarmin
+        if hasDate {
             parts.append(Self.rowDateFormatter.string(from: plan.date).uppercased())
         }
+        // A "NEEDS PACE" tag follows the summary. To keep the row on one line,
+        // trim what it would push off: minutes always, and the phase count too
+        // once there's a date to anchor the row.
         let count = plan.phases.count
-        parts.append("\(count) \(count == 1 ? "PHASE" : "PHASES")")
+        if !plan.needsPace || !hasDate {
+            parts.append("\(count) \(count == 1 ? "PHASE" : "PHASES")")
+        }
         let minutes = plan.estimatedMinutes
-        if minutes > 0 { parts.append("~\(minutes) MIN") }
+        if minutes > 0, !plan.needsPace { parts.append("~\(minutes) MIN") }
         if isActive { parts.append("LOADED") }
         return parts.joined(separator: " · ")
     }
