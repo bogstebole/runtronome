@@ -159,20 +159,34 @@ enum GarminLogin {
             "username": email, "password": password, "embed": "true", "_csrf": csrf
         ])
         let (data, response) = try await session.data(for: request)
-        let html = String(data: data, encoding: .utf8) ?? ""
 
-        if html.contains("MFA") || (response.url?.absoluteString.contains("verifyMFA") ?? false) {
+        // Success is signalled by a service ticket in the response — check for
+        // it FIRST. The page mentions "MFA" (a set-up link) even when 2FA is
+        // off, so keying MFA on that string wrongly hijacks a good login.
+        if let ticket = extractTicket(from: data) {
+            try await completeLogin(ticket: ticket, session: session)
+            return .success
+        }
+
+        // No ticket: only a real 2FA challenge redirects to the verify page or
+        // renders an MFA-code field. Anything else is bad credentials.
+        let onMFAPage = (response.url?.absoluteString.contains("verifyMFA") ?? false)
+            || contains(#"(mfa-code|verifyMFA|loginEnterMfaCode)"#, in: data)
+        if onMFAPage {
             guard let mfaCsrf = firstMatch(#"name="_csrf"\s+value="([^"]+)""#, in: data) else {
                 throw GarminAuthError.parse("couldn't find the MFA form token.")
             }
             return .mfaRequired(GarminMFAContext(csrf: mfaCsrf, session: session))
         }
 
-        guard let ticket = firstMatch(#"embed\?ticket=([^"]+)""#, in: data) else {
-            throw GarminAuthError.badCredentials
-        }
-        try await completeLogin(ticket: ticket, session: session)
-        return .success
+        throw GarminAuthError.badCredentials
+    }
+
+    /// The service ticket appears in a redirect URL in the response body.
+    /// Garmin has shipped a couple of shapes over the years, so try both.
+    private static func extractTicket(from data: Data) -> String? {
+        firstMatch(#"embed\?ticket=([^"'&]+)"#, in: data)
+            ?? firstMatch(#"ticket=([A-Za-z0-9-]+-cas)"#, in: data)
     }
 
     // MARK: Step 2 — MFA code (only when Garmin asks)
@@ -188,7 +202,7 @@ enum GarminLogin {
             "mfa-code": code, "embed": "true", "_csrf": context.csrf, "fromPage": "setupEnterMfaCode"
         ])
         let (data, _) = try await context.session.data(for: request)
-        guard let ticket = firstMatch(#"embed\?ticket=([^"]+)""#, in: data) else {
+        guard let ticket = extractTicket(from: data) else {
             throw GarminAuthError.badCredentials
         }
         try await completeLogin(ticket: ticket, session: context.session)
@@ -275,6 +289,13 @@ enum GarminLogin {
     private static func get(_ session: URLSession, _ url: URL) async throws -> (Data, URLResponse) {
         do { return try await session.data(from: url) }
         catch { throw GarminAuthError.network("Couldn't reach Garmin — check your connection.") }
+    }
+
+    private static func contains(_ pattern: String, in data: Data) -> Bool {
+        guard let html = String(data: data, encoding: .utf8),
+              let regex = try? NSRegularExpression(pattern: pattern)
+        else { return false }
+        return regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)) != nil
     }
 
     private static func firstMatch(_ pattern: String, in data: Data) -> String? {
