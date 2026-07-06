@@ -53,7 +53,7 @@ struct SPMStepper: View {
             .frame(height: 28)
 
             Text("SPM")
-                .font(.momoTrust(size: 9, weight: .regular))
+                .font(.appSans(size: 9, weight: .regular))
                 .tracking(1.2)
                 .foregroundColor(Theme.textTertiary)
         }

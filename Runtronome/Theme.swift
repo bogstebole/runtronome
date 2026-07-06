@@ -58,7 +58,7 @@ struct MetaLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.momoTrust(size: 11, weight: .regular))
+            .font(.appSans(size: 11, weight: .regular))
             .tracking(1.2)
             .foregroundColor(color)
     }

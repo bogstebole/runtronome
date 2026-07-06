@@ -43,7 +43,7 @@ struct WorkoutPlanCard: View {
                     Spacer()
                     HStack(spacing: 6) {
                         Text("SET PACE")
-                            .font(.momoTrust(size: 11, weight: .bold))
+                            .font(.appSans(size: 11, weight: .bold))
                             .tracking(1.5)
                             .foregroundColor(Theme.textPrimary)
                         Image(systemName: "arrow.right")

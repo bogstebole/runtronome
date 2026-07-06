@@ -42,7 +42,7 @@ struct PhaseEditorView: View {
                         Image(systemName: "arrow.left")
                             .font(.system(size: 11, weight: .bold))
                         Text("BACK")
-                            .font(.momoTrust(size: 11, weight: .bold))
+                            .font(.appSans(size: 11, weight: .bold))
                             .tracking(1.5)
                     }
                     .foregroundColor(Theme.textSecondary)
@@ -108,7 +108,7 @@ private struct PhaseRow: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(phase.title.uppercased())
-                        .font(.momoTrust(size: 14, weight: .medium))
+                        .font(.appSans(size: 14, weight: .medium))
                         .tracking(1.0)
                         .foregroundColor(Theme.textPrimary)
                     MetaLabel(text: phase.goal.display.uppercased(), color: Theme.textTertiary)

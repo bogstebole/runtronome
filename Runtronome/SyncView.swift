@@ -72,7 +72,7 @@ struct SyncView: View {
             VStack(spacing: 18) {
                 SyncSpinner(color: Theme.textPrimary, size: 34)
                 Text("FETCHING WORKOUT…")
-                    .font(.momoTrust(size: 11, weight: .regular))
+                    .font(.appSans(size: 11, weight: .regular))
                     .foregroundColor(Theme.textTertiary)
             }
             .transition(.opacity)
@@ -96,10 +96,10 @@ struct SyncView: View {
                 .font(.system(size: 30, weight: .light))
                 .foregroundColor(Theme.textSecondary)
             Text(title)
-                .font(.momoTrust(size: 17, weight: .medium))
+                .font(.appSans(size: 17, weight: .medium))
                 .foregroundColor(Theme.textPrimary)
             Text(subtitle)
-                .font(.momoTrust(size: 13, weight: .regular))
+                .font(.appSans(size: 13, weight: .regular))
                 .foregroundColor(Theme.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
