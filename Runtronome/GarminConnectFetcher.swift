@@ -62,7 +62,7 @@ struct GarminConnectFetcher: WorkoutFetcherService {
         let token = try await GarminSession.validAccessToken()
         let workout: GarminWorkout = try await get(
             "\(Self.api)/workout-service/workout/\(scheduled.id)", token: token)
-        return Self.makePlan(from: workout, date: scheduled.date)
+        return Self.makePlan(from: workout, date: scheduled.date, garminWorkoutId: scheduled.id)
     }
 
     func fetchTodaysWorkout() async throws -> WorkoutPlan {
@@ -115,7 +115,7 @@ struct GarminConnectFetcher: WorkoutFetcherService {
 
     // MARK: Mapping Garmin's step tree → WorkoutElements
 
-    static func makePlan(from workout: GarminWorkout, date: Date) -> WorkoutPlan {
+    static func makePlan(from workout: GarminWorkout, date: Date, garminWorkoutId: Int64? = nil) -> WorkoutPlan {
         let steps = workout.workoutSegments?.flatMap { $0.workoutSteps ?? [] } ?? []
         let elements = steps.flatMap(elements(from:))
         return WorkoutPlan(
@@ -123,6 +123,7 @@ struct GarminConnectFetcher: WorkoutFetcherService {
             date: date,
             location: "",
             temperature: "",
+            garminWorkoutId: garminWorkoutId,
             elements: elements,
             phases: elements.expandedPhases
         )

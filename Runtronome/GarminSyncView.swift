@@ -6,14 +6,14 @@ import SwiftUI
 /// per-phase SPM assignment.
 struct GarminSyncView: View {
     var onBack: () -> Void
-    /// Called with the chosen workout's fetched plan.
-    var onFetched: (WorkoutPlan) -> Void
+    /// Called with the freshly imported plans (the new ones only).
+    var onImported: ([WorkoutPlan]) -> Void
 
     private enum Phase {
         case credentials
         case mfa(GarminMFAContext)
         case working(String)
-        case picker([GarminScheduledWorkout])
+        case review([GarminScheduledWorkout])
         case failed(String)
     }
 
@@ -21,6 +21,9 @@ struct GarminSyncView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var mfaCode = ""
+    /// Garmin ids already in the library, snapshotted when the review list
+    /// loads so each row shows a stable NEW / SYNCED badge.
+    @State private var alreadyImported: Set<Int64> = []
     @FocusState private var focusedField: Field?
 
     private enum Field { case email, password, mfa }
@@ -39,10 +42,10 @@ struct GarminSyncView: View {
 
             content
                 .padding(.horizontal, 24)
-                .padding(.top, isPicker ? 8 : 32)
-                .frame(maxHeight: isPicker ? .infinity : nil, alignment: .top)
+                .padding(.top, isReview ? 8 : 32)
+                .frame(maxHeight: isReview ? .infinity : nil, alignment: .top)
 
-            if !isPicker { Spacer() }
+            if !isReview { Spacer() }
 
             footer
                 .padding(.horizontal, 24)
@@ -98,8 +101,9 @@ struct GarminSyncView: View {
             HStack {
                 MetaLabel(text: subtitle)
                 Spacer()
-                if case .picker(let workouts) = phase {
-                    MetaLabel(text: "\(workouts.count) SCHEDULED", color: Theme.textTertiary)
+                if case .review(let workouts) = phase {
+                    let newCount = workouts.filter { !alreadyImported.contains($0.id) }.count
+                    MetaLabel(text: "\(newCount) NEW · \(workouts.count) TOTAL", color: Theme.textTertiary)
                 }
             }
             .padding(.bottom, 14)
@@ -108,14 +112,14 @@ struct GarminSyncView: View {
         }
     }
 
-    private var isPicker: Bool {
-        if case .picker = phase { return true }
+    private var isReview: Bool {
+        if case .review = phase { return true }
         return false
     }
 
     private var subtitle: String {
         switch phase {
-        case .picker: return "PICK A WORKOUT TO IMPORT"
+        case .review: return "REVIEW & IMPORT"
         case .mfa:    return "VERIFY IT'S YOU"
         default:      return "PULL YOUR PLANNED WORKOUTS"
         }
@@ -158,7 +162,7 @@ struct GarminSyncView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 60)
 
-        case .picker(let workouts):
+        case .review(let workouts):
             workoutList(workouts)
 
         case .failed(let message):
@@ -233,8 +237,17 @@ struct GarminSyncView: View {
                 .opacity(mfaCode.isEmpty ? 0.4 : 1)
                 .disabled(mfaCode.isEmpty)
 
-        case .working, .picker:
+        case .working:
             EmptyView()
+
+        case .review(let workouts):
+            let newWorkouts = workouts.filter { !alreadyImported.contains($0.id) }
+            Button(newWorkouts.isEmpty ? "ALL SYNCED" : "IMPORT \(newWorkouts.count) NEW") {
+                importAll(newWorkouts)
+            }
+            .buttonStyle(.app(.primary))
+            .opacity(newWorkouts.isEmpty ? 0.4 : 1)
+            .disabled(newWorkouts.isEmpty)
 
         case .failed:
             Button("TRY AGAIN") {
@@ -244,7 +257,7 @@ struct GarminSyncView: View {
         }
     }
 
-    // MARK: Workout picker list
+    // MARK: Review list (new vs already-synced)
 
     private func workoutList(_ workouts: [GarminScheduledWorkout]) -> some View {
         Group {
@@ -266,7 +279,7 @@ struct GarminSyncView: View {
                 ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: 0) {
                         ForEach(workouts) { workout in
-                            workoutRow(workout)
+                            workoutRow(workout, isNew: !alreadyImported.contains(workout.id))
                         }
                     }
                 }
@@ -274,36 +287,44 @@ struct GarminSyncView: View {
         }
     }
 
-    private func workoutRow(_ workout: GarminScheduledWorkout) -> some View {
-        Button {
-            importWorkout(workout)
-        } label: {
-            VStack(spacing: 0) {
-                HStack(spacing: 14) {
-                    Text(Self.rowDateFormatter.string(from: workout.date).uppercased())
-                        .font(.momoTrust(size: 11, weight: .bold))
-                        .tracking(1.0)
-                        .foregroundColor(isToday(workout.date) ? Theme.textPrimary : Theme.textTertiary)
-                        .frame(width: 92, alignment: .leading)
+    private func workoutRow(_ workout: GarminScheduledWorkout, isNew: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                Text(Self.rowDateFormatter.string(from: workout.date).uppercased())
+                    .font(.momoTrust(size: 11, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundColor(isToday(workout.date) ? Theme.textPrimary : Theme.textTertiary)
+                    .frame(width: 92, alignment: .leading)
 
-                    Text(workout.title)
-                        .font(.momoTrust(size: 15, weight: .medium))
-                        .foregroundColor(Theme.textPrimary)
-                        .lineLimit(1)
+                Text(workout.title)
+                    .font(.momoTrust(size: 15, weight: .medium))
+                    .foregroundColor(isNew ? Theme.textPrimary : Theme.textTertiary)
+                    .lineLimit(1)
 
-                    Spacer(minLength: 8)
+                Spacer(minLength: 8)
 
-                    Image(systemName: "arrow.down")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(Theme.textSecondary)
-                }
-                .padding(.vertical, 16)
-
-                Hairline()
+                statusBadge(isNew ? "NEW" : "SYNCED", filled: isNew)
             }
-            .contentShape(Rectangle())
+            .padding(.vertical, 16)
+            .opacity(isNew ? 1 : 0.6)
+
+            Hairline()
         }
-        .buttonStyle(PressableButtonStyle())
+    }
+
+    /// Small caps chip: filled white for NEW, hairline-outlined for SYNCED.
+    private func statusBadge(_ text: String, filled: Bool) -> some View {
+        Text(text)
+            .font(.momoTrust(size: 9, weight: .bold))
+            .tracking(1.2)
+            .foregroundColor(filled ? Theme.ctaLabel : Theme.textTertiary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                filled
+                    ? AnyView(Rectangle().fill(Theme.ctaFill))
+                    : AnyView(Rectangle().strokeBorder(Theme.hairline, lineWidth: 1))
+            )
     }
 
     private func isToday(_ date: Date) -> Bool {
@@ -343,29 +364,38 @@ struct GarminSyncView: View {
         }
     }
 
-    /// Load the list of scheduled workouts to choose from.
+    /// Load the calendar and snapshot which workouts are already in the library
+    /// so the review list can tag each NEW or SYNCED.
     private func fetchUpcoming() {
         phase = .working("READING YOUR CALENDAR…")
         Task {
             do {
                 let workouts = try await GarminConnectFetcher().fetchUpcoming()
-                phase = .picker(workouts)
+                alreadyImported = PlanStore.garminWorkoutIds()
+                phase = .review(workouts)
             } catch {
                 phase = .failed(readable(error))
             }
         }
     }
 
-    /// Pull one chosen workout's full structure and hand it up for SPM assignment.
-    private func importWorkout(_ workout: GarminScheduledWorkout) {
-        phase = .working("FETCHING WORKOUT…")
+    /// Pull the full structure of every new workout and hand them all up to be
+    /// saved into the library. Already-synced workouts are left untouched.
+    private func importAll(_ workouts: [GarminScheduledWorkout]) {
+        guard !workouts.isEmpty else { onImported([]); return }
         Task {
-            do {
-                let plan = try await GarminConnectFetcher().fetchWorkout(workout)
-                onFetched(plan)
-            } catch {
-                phase = .failed(readable(error))
+            let fetcher = GarminConnectFetcher()
+            var imported: [WorkoutPlan] = []
+            for (index, workout) in workouts.enumerated() {
+                phase = .working("IMPORTING \(index + 1)/\(workouts.count)…")
+                do {
+                    imported.append(try await fetcher.fetchWorkout(workout))
+                } catch {
+                    phase = .failed(readable(error))
+                    return
+                }
             }
+            onImported(imported)
         }
     }
 
