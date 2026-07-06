@@ -118,6 +118,10 @@ struct WorkoutPlan: Identifiable, Codable, Equatable {
     let date: Date
     let location: String
     let temperature: String
+    /// Garmin's workout id when this plan came from a Connect sync. The dedup
+    /// key that lets a re-sync tell "already imported" from "new". Optional so
+    /// manually built plans (and older saved payloads) decode without it.
+    var garminWorkoutId: Int64?
     /// Structured elements (steps + repeat blocks) for re-editing; optional so
     /// mock/HealthKit payloads decode without it. `phases` always holds the
     /// expanded, runnable sequence the metronome plays.
@@ -130,6 +134,7 @@ struct WorkoutPlan: Identifiable, Codable, Equatable {
         date: Date,
         location: String,
         temperature: String,
+        garminWorkoutId: Int64? = nil,
         elements: [WorkoutElement]? = nil,
         phases: [WorkoutPhase]
     ) {
@@ -138,15 +143,22 @@ struct WorkoutPlan: Identifiable, Codable, Equatable {
         self.date = date
         self.location = location
         self.temperature = temperature
+        self.garminWorkoutId = garminWorkoutId
         self.elements = elements
         self.phases = phases
     }
+
+    /// `true` for plans pulled from a Garmin Connect sync.
+    var isFromGarmin: Bool { garminWorkoutId != nil }
 
     /// Number of phases with a cadence already assigned.
     var assignedCount: Int { phases.filter(\.isAssigned).count }
 
     /// `true` when every phase has a target SPM.
     var allAssigned: Bool { !phases.isEmpty && phases.allSatisfy(\.isAssigned) }
+
+    /// `true` when at least one phase still needs a cadence.
+    var needsPace: Bool { !allAssigned }
 
     /// Summed minutes across time-based phases (distance phases can't be timed
     /// without a pace, so they're excluded — surface this as "~" in the UI).

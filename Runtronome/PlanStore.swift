@@ -31,6 +31,26 @@ enum PlanStore {
         return plans
     }
 
+    /// Garmin workout ids already in the library — the "already synced" set a
+    /// re-sync checks against.
+    static func garminWorkoutIds() -> Set<Int64> {
+        Set(load().compactMap(\.garminWorkoutId))
+    }
+
+    /// Add freshly synced Garmin plans, skipping any whose workout id is
+    /// already saved (never clobbers cadences the user already assigned).
+    /// Returns the updated list.
+    @discardableResult
+    static func addNewGarmin(_ imported: [WorkoutPlan]) -> [WorkoutPlan] {
+        var plans = load()
+        let existing = Set(plans.compactMap(\.garminWorkoutId))
+        for plan in imported where !(plan.garminWorkoutId.map(existing.contains) ?? true) {
+            plans.append(plan)
+        }
+        save(plans)
+        return plans
+    }
+
     /// Returns the updated list.
     @discardableResult
     static func delete(_ id: UUID) -> [WorkoutPlan] {

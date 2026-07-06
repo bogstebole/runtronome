@@ -12,14 +12,11 @@ struct PlansFlowView: View {
     private enum Mode: Equatable {
         case list
         case build(WorkoutPlan?)   // nil = new plan
-        case sync                  // Garmin Connect login + fetch
-        case assign                // per-phase SPM assignment for a synced plan
+        case sync                  // Garmin Connect login + bulk import
     }
 
     @State private var plans: [WorkoutPlan] = PlanStore.load()
     @State private var mode: Mode = .list
-    /// The freshly synced plan being assigned cadences in `.assign` mode.
-    @State private var syncedPlan: WorkoutPlan?
 
     var body: some View {
         ZStack {
@@ -45,26 +42,14 @@ struct PlansFlowView: View {
             case .sync:
                 GarminSyncView(
                     onBack: { withAnimation(.easeInOut(duration: 0.2)) { mode = .list } },
-                    onFetched: { plan in
-                        syncedPlan = plan
-                        withAnimation(.easeInOut(duration: 0.2)) { mode = .assign }
+                    onImported: { imported in
+                        // Merge into the library (skips duplicates), then land
+                        // back on the list where the new plans show their status.
+                        plans = PlanStore.addNewGarmin(imported)
+                        withAnimation(.easeInOut(duration: 0.2)) { mode = .list }
                     }
                 )
                 .transition(.opacity)
-
-            case .assign:
-                if let binding = Binding($syncedPlan) {
-                    PhaseEditorView(
-                        plan: binding,
-                        onBack: { withAnimation(.easeInOut(duration: 0.2)) { mode = .sync } },
-                        onSaveStart: { configured in
-                            plans = PlanStore.upsert(configured)
-                            onApply(configured)
-                            onClose()
-                        }
-                    )
-                    .transition(.opacity)
-                }
             }
         }
     }
@@ -180,9 +165,22 @@ struct PlansFlowView: View {
                         .lineLimit(1)
                     MetaLabel(text: rowSummary(plan, isActive: isActive),
                               color: isActive ? Theme.textSecondary : Theme.textTertiary)
+                        .lineLimit(1)
                 }
 
                 Spacer(minLength: 12)
+
+                // "NEEDS PACE" flags a plan (typically a fresh Garmin import)
+                // that still has phases without a cadence assigned.
+                if plan.needsPace {
+                    Text("NEEDS PACE")
+                        .font(.momoTrust(size: 9, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundColor(Theme.ctaLabel)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Rectangle().fill(Theme.ctaFill))
+                }
 
                 rowButton("square.and.pencil") {
                     withAnimation(.easeInOut(duration: 0.2)) { mode = .build(plan) }
@@ -199,11 +197,21 @@ struct PlansFlowView: View {
         }
     }
 
+    private static let rowDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE d MMM"
+        return f
+    }()
+
     private func rowSummary(_ plan: WorkoutPlan, isActive: Bool) -> String {
+        var parts: [String] = []
+        // Garmin plans lead with their scheduled date so the calendar is legible.
+        if plan.isFromGarmin {
+            parts.append(Self.rowDateFormatter.string(from: plan.date).uppercased())
+        }
         let count = plan.phases.count
-        let phases = "\(count) \(count == 1 ? "PHASE" : "PHASES")"
+        parts.append("\(count) \(count == 1 ? "PHASE" : "PHASES")")
         let minutes = plan.estimatedMinutes
-        var parts = [phases]
         if minutes > 0 { parts.append("~\(minutes) MIN") }
         if isActive { parts.append("LOADED") }
         return parts.joined(separator: " · ")
