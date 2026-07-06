@@ -99,10 +99,11 @@ struct ContentView: View {
                 footerView
             }
             .padding(.horizontal, 24)
-            .blur(radius: isPickingFrequency ? 10 : 0)
-            .allowsHitTesting(!isPickingFrequency)
+            .blur(radius: (isPickingFrequency || isEditingSPM) ? 10 : 0)
+            .allowsHitTesting(!isPickingFrequency && !isEditingSPM)
 
             frequencyOverlay
+            spmEditOverlay
         }
         .sensoryFeedback(.impact(weight: .heavy, intensity: 0.9), trigger: hapticTrigger)
         .onAppear { setup() }
@@ -262,13 +263,11 @@ struct ContentView: View {
     private let wheelHeight: CGFloat = 396
     @State private var wheelSelection: Int?
 
-    @ViewBuilder
+    // The wheel stays in the hierarchy while editing (the editor is an overlay)
+    // — recreating the ScrollView desyncs its scroll position and corrupts the
+    // selection binding.
     private var cadenceRail: some View {
-        if isEditingSPM {
-            spmEditor
-        } else {
-            spmWheel
-        }
+        spmWheel
     }
 
     /// A real wheel (like the system timer picker): the whole column scrolls
@@ -345,8 +344,8 @@ struct ContentView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 if value == Int(spm) {
-                    spmInputText = "\(value)"
-                    isEditingSPM = true
+                    spmInputText = ""   // placeholder shows the current value
+                    withAnimation(.easeInOut(duration: 0.2)) { isEditingSPM = true }
                     spmFieldFocused = true
                 } else {
                     withAnimation(.snappy) { wheelSelection = value }
@@ -354,25 +353,45 @@ struct ContentView: View {
             }
     }
 
-    private var spmEditor: some View {
-        TextField("", text: $spmInputText)
-            .font(.anton(size: 140))
-            .foregroundColor(Theme.textPrimary)
-            .multilineTextAlignment(.center)
-            .keyboardType(.numberPad)
-            .focused($spmFieldFocused)
-            .frame(height: wheelHeight)
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { commitSPMEdit() }
-                        .font(.momoTrust(size: 16, weight: .medium))
-                        .foregroundColor(.white)
+    /// Focused typing mode: the whole screen blurs and only the number being
+    /// entered stays sharp. Empty input (or a tap outside) leaves the cadence
+    /// unchanged.
+    private var spmEditOverlay: some View {
+        ZStack {
+            Color.black
+                .opacity(isEditingSPM ? 0.62 : 0)
+                .ignoresSafeArea()
+                .onTapGesture { commitSPMEdit() }
+
+            if isEditingSPM {
+                VStack(spacing: 4) {
+                    MetaLabel(text: "TYPE CADENCE", color: Theme.textSecondary)
+                    TextField("", text: $spmInputText,
+                              prompt: Text("\(Int(spm))").foregroundStyle(Theme.textSecondary))
+                        .font(.anton(size: 140))
+                        .foregroundColor(Theme.textPrimary)
+                        .tint(Theme.textPrimary)
+                        .multilineTextAlignment(.center)
+                        .keyboardType(.numberPad)
+                        .focused($spmFieldFocused)
+                        .frame(width: 320)
+                        .toolbar {
+                            ToolbarItemGroup(placement: .keyboard) {
+                                Spacer()
+                                Button("Done") { commitSPMEdit() }
+                                    .font(.momoTrust(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    MetaLabel(text: "SPM", color: Theme.textTertiary)
                 }
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
-            .onChange(of: spmFieldFocused) { _, focused in
-                if !focused { commitSPMEdit() }
-            }
+        }
+        .allowsHitTesting(isEditingSPM)
+        .onChange(of: spmFieldFocused) { _, focused in
+            if !focused, isEditingSPM { commitSPMEdit() }
+        }
     }
 
     // MARK: Footer (hairline + status row + transport)
@@ -660,14 +679,16 @@ struct ContentView: View {
         metronomeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in tick() }
     }
 
+    /// Close the typing overlay; apply the value only when something valid was
+    /// typed. Setting `isEditingSPM = false` first lets `onChange(of: spm)`
+    /// handle widget sync / metronome restart / Live Activity.
     private func commitSPMEdit() {
-        if let parsed = Double(spmInputText) {
-            spm = min(max(parsed.rounded(), Double(wheelRange.lowerBound)), Double(wheelRange.upperBound))
-        }
-        isEditingSPM = false
+        withAnimation(.easeInOut(duration: 0.2)) { isEditingSPM = false }
         spmFieldFocused = false
-        syncWidget()
-        if isPlaying { restartMetronome(); updateLiveActivity() }
+        let digits = spmInputText.filter(\.isNumber)
+        spmInputText = ""
+        guard let parsed = Double(digits), parsed > 0 else { return }
+        spm = min(max(parsed.rounded(), Double(wheelRange.lowerBound)), Double(wheelRange.upperBound))
     }
 
     // MARK: Live Activity
