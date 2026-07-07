@@ -538,7 +538,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Runtronome/Info.plist;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runtronome uses your location to show your city and weather.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runtronome uses your location to track distance during a run so interval phases advance on their own, and to show your city and weather.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -574,7 +574,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Runtronome/Info.plist;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runtronome uses your location to show your city and weather.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runtronome uses your location to track distance during a run so interval phases advance on their own, and to show your city and weather.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

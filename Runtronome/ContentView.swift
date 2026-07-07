@@ -3,6 +3,10 @@ import ActivityKit
 
 struct ContentView: View {
     @State private var locationService = LocationService()
+    /// GPS distance tracker — drives hands-free advance on distance phases.
+    @State private var runTracker = RunTracker()
+    /// Cumulative tracked distance at the moment the current distance phase began.
+    @State private var phaseStartDistance: Double = 0
 
     // Seeded from the sync flow's MetronomeConfiguration (see init below).
     // Defaults preserve the original standalone behaviour for previews.
@@ -119,6 +123,7 @@ struct ContentView: View {
         .onChange(of: alertFrequency) { _, _ in syncWidget(); if isPlaying { updateLiveActivity() } }
         .onChange(of: phaseLabel) { _, _ in syncWidget(); if isPlaying { updateLiveActivity() } }
         .onChange(of: isGarminConnected) { _, _ in syncWidget() }
+        .onChange(of: runTracker.distance) { _, _ in checkDistanceAdvance() }
         .fullScreenCover(isPresented: $showingBuilder) {
             PlansFlowView(
                 activePlanID: plan?.id,
@@ -578,7 +583,20 @@ struct ContentView: View {
         } else {
             phaseRemaining = 0
         }
+        // Baseline for this phase's GPS distance goal (harmless for non-distance).
+        phaseStartDistance = runTracker.distance
         if isPlaying { restartMetronome() }
+    }
+
+    /// Fired on every GPS distance update: a distance phase advances itself once
+    /// the goal metres are covered. Falls back to the manual "NEXT" bar when
+    /// location is unavailable.
+    private func checkDistanceAdvance() {
+        guard isPlaying, let phase = currentPhase,
+              case .distance(let meters) = phase.goal else { return }
+        if runTracker.distance - phaseStartDistance >= Double(meters) {
+            advancePhase()
+        }
     }
 
     private func advancePhase() {
@@ -606,6 +624,7 @@ struct ContentView: View {
 
     private func setup() {
         syncWidget()
+
         clockTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
             // Update clock display once per second
             let now = Date()
@@ -660,6 +679,7 @@ struct ContentView: View {
         isPaused = false
         isPlaying = true
         stepCount = 0
+        runTracker.start()   // begin GPS distance tracking (resets to 0)
         applyCurrentPhase()  // seed label/cadence/countdown from the first phase
         startLiveActivity()
         restartMetronome()   // schedules ticks unless the current phase is a pause
@@ -681,6 +701,7 @@ struct ContentView: View {
     private func finishSession() {
         metronomeTimer?.invalidate()
         metronomeTimer = nil
+        runTracker.stop()
         endLiveActivity()
         isPlaying = false
         isPaused = false
