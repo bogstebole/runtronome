@@ -2,27 +2,25 @@ import Foundation
 
 // MARK: - Interval progress analytics
 //
-// Groups laps across many runs into like-for-like intervals — same distance and
-// same pace band — so heart rate can be compared fairly over time. Running an
-// 800 m at 4:05 and later running another 800 m at 4:05 with a lower HR is real
-// fitness; comparing different paces isn't, so pace is part of the key.
+// One row per workout name (Hill Repeats, Speed Runs, Goal Pace Runs…). For
+// each run of that workout we average the heart rate of its *work intervals
+// only* — warm-up, cadence drills, accelerator glides and recoveries are all
+// dropped — and chart that average over time. Same workout, weeks apart, lower
+// HR = fitter.
 
-/// One run's contribution to an interval group: the average HR of that run's
-/// laps in the group.
+/// One run's contribution to a workout trend: the average HR of that run's
+/// work intervals.
 struct SessionPoint: Identifiable, Equatable {
     let id: Int64            // activityId
     let date: Date
     let avgHR: Double
-    let avgPaceSecPerKm: Double
-    let lapCount: Int
+    let intervalCount: Int
 }
 
-/// A set of like-for-like intervals tracked across sessions.
-struct IntervalGroup: Identifiable, Equatable {
-    let id: String
-    let workoutName: String  // the recognisable label, e.g. "Speed Intervals"
-    let distance: Int        // metres, bucketed
-    let paceBand: Int        // sec/km, lower bound of the pace band
+/// A named workout tracked across sessions.
+struct WorkoutTrend: Identifiable, Equatable {
+    let id: String           // normalised workout name
+    let name: String         // display name
     let sessions: [SessionPoint]   // sorted oldest → newest
 
     var sessionCount: Int { sessions.count }
@@ -35,85 +33,44 @@ struct IntervalGroup: Identifiable, Equatable {
         guard let f = firstHR, let l = latestHR else { return nil }
         return l - f
     }
-
-    var distanceLabel: String {
-        distance >= 1000 ? String(format: "%.1f KM", Double(distance) / 1000) : "\(distance) M"
-    }
-
-    var paceLabel: String { Self.paceString(Double(paceBand)) }
-
-    static func paceString(_ secPerKm: Double) -> String {
-        guard secPerKm.isFinite, secPerKm > 0 else { return "—" }
-        let m = Int(secPerKm) / 60, s = Int(secPerKm) % 60
-        return String(format: "%d:%02d/KM", m, s)
-    }
 }
 
 enum ProgressAnalytics {
-    /// Bucket sizes chosen so natural run-to-run variation clusters, but 800m@4:05
-    /// and 800m@4:30 stay apart.
-    private static let distanceBucket = 100     // metres
-    private static let paceBucket = 15          // sec/km
     private static let minLapDistance = 200.0   // ignore tiny drills / GPS scraps
     /// A lap counts as a work interval if its pace is within this factor of the
     /// session's fastest lap. Recovery jogs are far slower and drop out.
     private static let workPaceTolerance = 1.20
 
-    static func groups(from details: [GarminActivityDetail]) -> [IntervalGroup] {
-        // key → activityId → [ (hr, pace) ]
-        var buckets: [String: [Int64: [(hr: Double, pace: Double)]]] = [:]
-        var dates: [Int64: Date] = [:]
-        var names: [Int64: String] = [:]
+    /// One trend per workout name, most recently run first. Only runs with at
+    /// least one identifiable work interval, and names done at least twice.
+    static func trends(from details: [GarminActivityDetail]) -> [WorkoutTrend] {
+        var byName: [String: (display: String, points: [SessionPoint])] = [:]
 
         for detail in details {
-            dates[detail.activity.id] = detail.activity.date
-            names[detail.activity.id] = detail.activity.name
-            // Only the running intervals — recoveries/rests are excluded so their
-            // HR never dilutes the numbers.
-            for lap in workIntervals(in: detail.laps) {
-                guard let hr = lap.averageHR, let pace = lap.paceSecPerKm else { continue }
-                let distKey = Int((lap.distance / Double(distanceBucket)).rounded()) * distanceBucket
-                let paceKey = Int(pace / Double(paceBucket)) * paceBucket
-                let key = "\(distKey)-\(paceKey)"
-                buckets[key, default: [:]][detail.activity.id, default: []].append((hr, pace))
-            }
+            let work = workIntervals(in: detail.laps)
+            let hrs = work.compactMap(\.averageHR).filter { $0 > 0 }
+            guard !hrs.isEmpty else { continue }
+
+            let avgHR = hrs.reduce(0, +) / Double(hrs.count)
+            let point = SessionPoint(id: detail.activity.id, date: detail.activity.date,
+                                     avgHR: avgHR, intervalCount: hrs.count)
+            let key = normalise(detail.activity.name)
+            byName[key, default: (detail.activity.name, [])].points.append(point)
+            byName[key]?.display = detail.activity.name
         }
 
-        var groups: [IntervalGroup] = []
-        for (key, byActivity) in buckets {
-            let parts = key.split(separator: "-")
-            guard parts.count == 2, let dist = Int(parts[0]), let pace = Int(parts[1]) else { continue }
-
-            let sessions: [SessionPoint] = byActivity.compactMap { activityId, laps in
-                guard let date = dates[activityId], !laps.isEmpty else { return nil }
-                let avgHR = laps.map(\.hr).reduce(0, +) / Double(laps.count)
-                let avgPace = laps.map(\.pace).reduce(0, +) / Double(laps.count)
-                return SessionPoint(id: activityId, date: date, avgHR: avgHR,
-                                    avgPaceSecPerKm: avgPace, lapCount: laps.count)
-            }
-            .sorted { $0.date < $1.date }
-
-            // A trend needs at least two sessions.
+        var trends: [WorkoutTrend] = []
+        for (key, value) in byName {
+            let sessions = value.points.sorted { $0.date < $1.date }
             guard sessions.count >= 2 else { continue }
-
-            // Label the group with the workout name the runner recognises — the
-            // most common name across its sessions.
-            let name = mostCommonName(among: byActivity.keys, names: names)
-            groups.append(IntervalGroup(id: key, workoutName: name,
-                                        distance: dist, paceBand: pace, sessions: sessions))
+            trends.append(WorkoutTrend(id: key, name: value.display, sessions: sessions))
         }
-
-        // Surface the richest, fastest groups first — those are the work intervals
-        // the runner cares about; slow recovery laps sink to the bottom.
-        return groups.sorted {
-            $0.sessionCount != $1.sessionCount ? $0.sessionCount > $1.sessionCount
-                                               : $0.paceBand < $1.paceBand
-        }
+        return trends.sorted { ($0.lastDate ?? .distantPast) > ($1.lastDate ?? .distantPast) }
     }
 
     /// The running intervals in one activity: valid laps whose pace is close to
-    /// the session's fastest. Warm-up, cool-down and recovery laps are all much
-    /// slower and fall away, leaving just the efforts (800s, a magic mile, …).
+    /// the session's fastest. Warm-up, cool-down, drills and recovery laps are
+    /// all much slower and fall away, leaving just the efforts.
     private static func workIntervals(in laps: [GarminLap]) -> [GarminLap] {
         let valid = laps.filter {
             $0.distance >= minLapDistance && ($0.averageHR ?? 0) > 0 && $0.paceSecPerKm != nil
@@ -122,10 +79,7 @@ enum ProgressAnalytics {
         return valid.filter { ($0.paceSecPerKm ?? .infinity) <= fastest * workPaceTolerance }
     }
 
-    private static func mostCommonName(among ids: Dictionary<Int64, [(hr: Double, pace: Double)]>.Keys,
-                                       names: [Int64: String]) -> String {
-        var counts: [String: Int] = [:]
-        for id in ids { if let n = names[id] { counts[n, default: 0] += 1 } }
-        return counts.max { $0.value < $1.value }?.key ?? "Intervals"
+    private static func normalise(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }

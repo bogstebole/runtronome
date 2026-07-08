@@ -1,9 +1,9 @@
 import SwiftUI
 import Charts
 
-/// Heart-rate progress across like-for-like intervals. Pulls finished Garmin
-/// runs, groups their laps by distance + pace, and charts how HR trends over
-/// time — the same 800 m at the same pace, weeks apart.
+/// Heart-rate progress per workout. Pulls finished Garmin runs, and for each
+/// named workout charts the average HR of its *work intervals only* over time —
+/// the same session, weeks apart, showing fitness as HR comes down.
 struct RunProgressView: View {
     var onBack: () -> Void
     /// Called when the user isn't signed in yet — routes to the Garmin sign-in.
@@ -11,8 +11,8 @@ struct RunProgressView: View {
 
     private enum Phase {
         case loading(String)
-        case groups([IntervalGroup])
-        case detail(IntervalGroup)
+        case groups([WorkoutTrend])
+        case detail(WorkoutTrend)
         case empty
         case failed(String)
     }
@@ -70,27 +70,27 @@ struct RunProgressView: View {
     }
 
     private var headerTitle: String {
-        if case .detail(let g) = phase { return g.workoutName.uppercased() }
+        if case .detail(let g) = phase { return g.name.uppercased() }
         return "PROGRESS"
     }
 
     private var headerSubtitle: String {
         switch phase {
-        case .detail(let g): return "\(g.distanceLabel) · \(g.paceLabel) · \(dateRange(g))"
+        case .detail(let g): return "INTERVAL HR · \(dateRange(g))"
         case .groups:        return "PICK A WORKOUT TO SEE HR TREND"
-        default:             return "HEART RATE VS INTERVALS"
+        default:             return "INTERVAL HEART RATE OVER TIME"
         }
     }
 
     private var backLabel: String {
-        if case .detail = phase { return "INTERVALS" }
+        if case .detail = phase { return "WORKOUTS" }
         return "PLANS"
     }
 
     private func backAction() {
         if case .detail(let g) = phase {
             // Rebuild the list from cache without a refetch.
-            let groups = ProgressAnalytics.groups(from: ProgressStore.load())
+            let groups = ProgressAnalytics.trends(from: ProgressStore.load())
             withAnimation(.easeInOut(duration: 0.2)) {
                 phase = groups.isEmpty ? .empty : .groups(groups)
             }
@@ -132,7 +132,7 @@ struct RunProgressView: View {
                     .font(.appSans(size: 14, weight: .medium))
                     .tracking(1.2)
                     .foregroundColor(Theme.textPrimary)
-                Text("Run the same interval (same distance & pace) at least twice and it'll show up here.")
+                Text("Run the same workout at least twice and its heart-rate trend shows up here.")
                     .font(.appSans(size: 12, weight: .regular))
                     .foregroundColor(Theme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -163,21 +163,20 @@ struct RunProgressView: View {
 
     // MARK: Group row
 
-    private func groupRow(_ group: IntervalGroup) -> some View {
+    private func groupRow(_ group: WorkoutTrend) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.2)) { phase = .detail(group) }
         } label: {
             VStack(spacing: 0) {
                 HStack(spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
-                        // Lead with the workout name the runner recognises.
-                        Text(group.workoutName.uppercased())
-                            .font(.appSans(size: 15, weight: .semibold))
+                        // Just the workout name and when you ran it.
+                        Text(group.name.uppercased())
+                            .font(.appSans(size: 16, weight: .semibold))
                             .foregroundColor(Theme.textPrimary)
                             .lineLimit(1)
-                        MetaLabel(text: "\(group.distanceLabel) · \(group.paceLabel)",
-                                  color: Theme.textSecondary)
-                        MetaLabel(text: dateRange(group), color: Theme.textTertiary)
+                        MetaLabel(text: "\(group.sessionCount) RUNS · \(dateRange(group))",
+                                  color: Theme.textTertiary)
                     }
                     Spacer(minLength: 12)
                     trendNumber(group)
@@ -193,7 +192,7 @@ struct RunProgressView: View {
     /// The one number that matters on the overview: how much HR moved,
     /// first → latest. Down is progress.
     @ViewBuilder
-    private func trendNumber(_ group: IntervalGroup) -> some View {
+    private func trendNumber(_ group: WorkoutTrend) -> some View {
         if let delta = group.deltaHR, abs(delta) >= 1 {
             let down = delta < 0
             VStack(alignment: .trailing, spacing: 0) {
@@ -215,7 +214,7 @@ struct RunProgressView: View {
         }
     }
 
-    private func dateRange(_ group: IntervalGroup) -> String {
+    private func dateRange(_ group: WorkoutTrend) -> String {
         guard let first = group.firstDate, let last = group.lastDate else { return "" }
         let f = Self.rangeFormatter
         return first == last ? f.string(from: first).uppercased()
@@ -228,7 +227,7 @@ struct RunProgressView: View {
 
     // MARK: Detail (chart)
 
-    private func detailView(_ group: IntervalGroup) -> some View {
+    private func detailView(_ group: WorkoutTrend) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Headline: first → latest.
             HStack(alignment: .firstTextBaseline, spacing: 20) {
@@ -269,7 +268,7 @@ struct RunProgressView: View {
         }
     }
 
-    private func chart(_ group: IntervalGroup) -> some View {
+    private func chart(_ group: WorkoutTrend) -> some View {
         Chart(group.sessions) { point in
             LineMark(
                 x: .value("Date", point.date),
@@ -303,7 +302,7 @@ struct RunProgressView: View {
         }
     }
 
-    private func yDomain(_ group: IntervalGroup) -> ClosedRange<Double> {
+    private func yDomain(_ group: WorkoutTrend) -> ClosedRange<Double> {
         let hrs = group.sessions.map(\.avgHR)
         let lo = (hrs.min() ?? 120) - 6
         let hi = (hrs.max() ?? 180) + 6
@@ -319,7 +318,7 @@ struct RunProgressView: View {
             return
         }
         // Show cached immediately, then refresh in the background.
-        let cachedGroups = ProgressAnalytics.groups(from: ProgressStore.load())
+        let cachedGroups = ProgressAnalytics.trends(from: ProgressStore.load())
         if !cachedGroups.isEmpty { phase = .groups(cachedGroups) }
         refresh()
     }
@@ -339,7 +338,7 @@ struct RunProgressView: View {
                 }
                 ProgressStore.save(cache)
 
-                let groups = ProgressAnalytics.groups(from: cache)
+                let groups = ProgressAnalytics.trends(from: cache)
                 withAnimation(.easeInOut(duration: 0.2)) {
                     phase = groups.isEmpty ? .empty : .groups(groups)
                 }
