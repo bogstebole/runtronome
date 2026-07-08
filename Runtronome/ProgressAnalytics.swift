@@ -20,11 +20,14 @@ struct SessionPoint: Identifiable, Equatable {
 /// A set of like-for-like intervals tracked across sessions.
 struct IntervalGroup: Identifiable, Equatable {
     let id: String
+    let workoutName: String  // the recognisable label, e.g. "Speed Intervals"
     let distance: Int        // metres, bucketed
     let paceBand: Int        // sec/km, lower bound of the pace band
     let sessions: [SessionPoint]   // sorted oldest → newest
 
     var sessionCount: Int { sessions.count }
+    var firstDate: Date? { sessions.first?.date }
+    var lastDate: Date? { sessions.last?.date }
     var firstHR: Double? { sessions.first?.avgHR }
     var latestHR: Double? { sessions.last?.avgHR }
     /// Negative = HR came down (improvement).
@@ -57,9 +60,11 @@ enum ProgressAnalytics {
         // key → activityId → [ (hr, pace) ]
         var buckets: [String: [Int64: [(hr: Double, pace: Double)]]] = [:]
         var dates: [Int64: Date] = [:]
+        var names: [Int64: String] = [:]
 
         for detail in details {
             dates[detail.activity.id] = detail.activity.date
+            names[detail.activity.id] = detail.activity.name
             for lap in detail.laps {
                 guard lap.distance >= minLapDistance,
                       let hr = lap.averageHR, hr > 0,
@@ -87,7 +92,12 @@ enum ProgressAnalytics {
 
             // A trend needs at least two sessions.
             guard sessions.count >= 2 else { continue }
-            groups.append(IntervalGroup(id: key, distance: dist, paceBand: pace, sessions: sessions))
+
+            // Label the group with the workout name the runner recognises — the
+            // most common name across its sessions.
+            let name = mostCommonName(among: byActivity.keys, names: names)
+            groups.append(IntervalGroup(id: key, workoutName: name,
+                                        distance: dist, paceBand: pace, sessions: sessions))
         }
 
         // Surface the richest, fastest groups first — those are the work intervals
@@ -96,5 +106,12 @@ enum ProgressAnalytics {
             $0.sessionCount != $1.sessionCount ? $0.sessionCount > $1.sessionCount
                                                : $0.paceBand < $1.paceBand
         }
+    }
+
+    private static func mostCommonName(among ids: Dictionary<Int64, [(hr: Double, pace: Double)]>.Keys,
+                                       names: [Int64: String]) -> String {
+        var counts: [String: Int] = [:]
+        for id in ids { if let n = names[id] { counts[n, default: 0] += 1 } }
+        return counts.max { $0.value < $1.value }?.key ?? "Intervals"
     }
 }

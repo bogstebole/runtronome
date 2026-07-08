@@ -70,15 +70,15 @@ struct RunProgressView: View {
     }
 
     private var headerTitle: String {
-        if case .detail(let g) = phase { return "\(g.distanceLabel) · \(g.paceLabel)" }
+        if case .detail(let g) = phase { return g.workoutName.uppercased() }
         return "PROGRESS"
     }
 
     private var headerSubtitle: String {
         switch phase {
-        case .detail: return "AVG HEART RATE PER SESSION"
-        case .groups: return "PICK AN INTERVAL TO SEE HR TREND"
-        default:      return "HEART RATE VS INTERVALS"
+        case .detail(let g): return "\(g.distanceLabel) · \(g.paceLabel) · \(dateRange(g))"
+        case .groups:        return "PICK A WORKOUT TO SEE HR TREND"
+        default:             return "HEART RATE VS INTERVALS"
         }
     }
 
@@ -169,14 +169,18 @@ struct RunProgressView: View {
         } label: {
             VStack(spacing: 0) {
                 HStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("\(group.distanceLabel) · \(group.paceLabel)")
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Lead with the workout name the runner recognises.
+                        Text(group.workoutName.uppercased())
                             .font(.appSans(size: 15, weight: .semibold))
                             .foregroundColor(Theme.textPrimary)
-                        MetaLabel(text: "\(group.sessionCount) SESSIONS", color: Theme.textTertiary)
+                            .lineLimit(1)
+                        MetaLabel(text: "\(group.distanceLabel) · \(group.paceLabel)",
+                                  color: Theme.textSecondary)
+                        MetaLabel(text: dateRange(group), color: Theme.textTertiary)
                     }
                     Spacer(minLength: 12)
-                    deltaBadge(group)
+                    trendNumber(group)
                 }
                 .padding(.vertical, 16)
                 Hairline()
@@ -186,28 +190,41 @@ struct RunProgressView: View {
         .buttonStyle(PressableButtonStyle())
     }
 
-    /// HR change first → latest. Down is good; shown a touch brighter.
-    private func deltaBadge(_ group: IntervalGroup) -> some View {
-        HStack(spacing: 8) {
-            if let latest = group.latestHR {
-                Text("\(Int(latest.rounded()))")
-                    .font(.anton(size: 22))
+    /// The one number that matters on the overview: how much HR moved,
+    /// first → latest. Down is progress.
+    @ViewBuilder
+    private func trendNumber(_ group: IntervalGroup) -> some View {
+        if let delta = group.deltaHR, abs(delta) >= 1 {
+            let down = delta < 0
+            VStack(alignment: .trailing, spacing: 0) {
+                Text("\(down ? "−" : "+")\(Int(abs(delta).rounded()))")
+                    .font(.anton(size: 28))
                     .foregroundColor(Theme.textPrimary)
-                Text("BPM").font(.appSans(size: 9, weight: .bold)).tracking(1.0)
+                Text(down ? "BPM LOWER" : "BPM HIGHER")
+                    .font(.appSans(size: 8, weight: .bold)).tracking(1.0)
                     .foregroundColor(Theme.textTertiary)
             }
-            if let delta = group.deltaHR, abs(delta) >= 1 {
-                let down = delta < 0
-                HStack(spacing: 2) {
-                    Image(systemName: down ? "arrow.down" : "arrow.up")
-                        .font(.system(size: 9, weight: .bold))
-                    Text("\(Int(abs(delta).rounded()))")
-                        .font(.appSans(size: 11, weight: .bold))
-                }
-                .foregroundColor(down ? Theme.textPrimary : Theme.textSecondary)
+        } else if let latest = group.latestHR {
+            VStack(alignment: .trailing, spacing: 0) {
+                Text("\(Int(latest.rounded()))")
+                    .font(.anton(size: 28))
+                    .foregroundColor(Theme.textPrimary)
+                Text("BPM").font(.appSans(size: 8, weight: .bold)).tracking(1.0)
+                    .foregroundColor(Theme.textTertiary)
             }
         }
     }
+
+    private func dateRange(_ group: IntervalGroup) -> String {
+        guard let first = group.firstDate, let last = group.lastDate else { return "" }
+        let f = Self.rangeFormatter
+        return first == last ? f.string(from: first).uppercased()
+                             : "\(f.string(from: first).uppercased()) – \(f.string(from: last).uppercased())"
+    }
+
+    private static let rangeFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "d MMM"; return f
+    }()
 
     // MARK: Detail (chart)
 
