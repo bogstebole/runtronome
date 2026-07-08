@@ -55,6 +55,9 @@ enum ProgressAnalytics {
     private static let distanceBucket = 100     // metres
     private static let paceBucket = 15          // sec/km
     private static let minLapDistance = 200.0   // ignore tiny drills / GPS scraps
+    /// A lap counts as a work interval if its pace is within this factor of the
+    /// session's fastest lap. Recovery jogs are far slower and drop out.
+    private static let workPaceTolerance = 1.20
 
     static func groups(from details: [GarminActivityDetail]) -> [IntervalGroup] {
         // key → activityId → [ (hr, pace) ]
@@ -65,10 +68,10 @@ enum ProgressAnalytics {
         for detail in details {
             dates[detail.activity.id] = detail.activity.date
             names[detail.activity.id] = detail.activity.name
-            for lap in detail.laps {
-                guard lap.distance >= minLapDistance,
-                      let hr = lap.averageHR, hr > 0,
-                      let pace = lap.paceSecPerKm else { continue }
+            // Only the running intervals — recoveries/rests are excluded so their
+            // HR never dilutes the numbers.
+            for lap in workIntervals(in: detail.laps) {
+                guard let hr = lap.averageHR, let pace = lap.paceSecPerKm else { continue }
                 let distKey = Int((lap.distance / Double(distanceBucket)).rounded()) * distanceBucket
                 let paceKey = Int(pace / Double(paceBucket)) * paceBucket
                 let key = "\(distKey)-\(paceKey)"
@@ -106,6 +109,17 @@ enum ProgressAnalytics {
             $0.sessionCount != $1.sessionCount ? $0.sessionCount > $1.sessionCount
                                                : $0.paceBand < $1.paceBand
         }
+    }
+
+    /// The running intervals in one activity: valid laps whose pace is close to
+    /// the session's fastest. Warm-up, cool-down and recovery laps are all much
+    /// slower and fall away, leaving just the efforts (800s, a magic mile, …).
+    private static func workIntervals(in laps: [GarminLap]) -> [GarminLap] {
+        let valid = laps.filter {
+            $0.distance >= minLapDistance && ($0.averageHR ?? 0) > 0 && $0.paceSecPerKm != nil
+        }
+        guard let fastest = valid.compactMap(\.paceSecPerKm).min() else { return [] }
+        return valid.filter { ($0.paceSecPerKm ?? .infinity) <= fastest * workPaceTolerance }
     }
 
     private static func mostCommonName(among ids: Dictionary<Int64, [(hr: Double, pace: Double)]>.Keys,
