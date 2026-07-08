@@ -13,6 +13,7 @@ struct PlansFlowView: View {
         case list
         case build(WorkoutPlan?)   // nil = new plan
         case sync                  // Garmin Connect login + bulk import
+        case progress              // heart-rate progress across intervals
     }
 
     @State private var plans: [WorkoutPlan] = PlanStore.load()
@@ -48,6 +49,13 @@ struct PlansFlowView: View {
                         plans = PlanStore.addNewGarmin(imported)
                         withAnimation(.easeInOut(duration: 0.2)) { mode = .list }
                     }
+                )
+                .transition(.opacity)
+
+            case .progress:
+                RunProgressView(
+                    onBack: { withAnimation(.easeInOut(duration: 0.2)) { mode = .list } },
+                    onNeedsSignIn: { withAnimation(.easeInOut(duration: 0.2)) { mode = .sync } }
                 )
                 .transition(.opacity)
             }
@@ -124,6 +132,18 @@ struct PlansFlowView: View {
                     .font(.anton(size: 30))
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { mode = .progress }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "chart.xyaxis.line").font(.system(size: 11, weight: .bold))
+                        Text("PROGRESS").font(.appSans(size: 11, weight: .bold)).tracking(1.2)
+                    }
+                    .foregroundColor(Theme.textSecondary)
+                    .padding(.trailing, 14)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
